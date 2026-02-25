@@ -20,17 +20,17 @@ const PLAN_INCLUDE_OPTIONS = ['Dining out', 'Hobbies', 'Holidays and gifts', 'Ch
 
 const POPULAR_BANKS = [
   { name: 'Chase', domain: 'chase.com', logoUrl: '/bank-logos/chase.png' },
-  { name: 'Bank of America', domain: 'bankofamerica.com' },
-  { name: 'Wells Fargo Bank', domain: 'wellsfargo.com' },
-  { name: 'Capital One', domain: 'capitalone.com' },
-  { name: 'American Express', domain: 'americanexpress.com' },
-  { name: 'Citibank', domain: 'citi.com' },
-  { name: 'Fidelity Inv & Retirement', domain: 'fidelity.com' },
-  { name: 'Discover Credit Card', domain: 'discover.com' },
-  { name: 'Robinhood', domain: 'robinhood.com' },
-  { name: 'Chime', domain: 'chime.com' },
-  { name: 'Charles Schwab', domain: 'schwab.com' },
-  { name: 'Navy Federal Credit Union', domain: 'navyfederal.org' },
+  { name: 'Bank of America', domain: 'bankofamerica.com', logoUrl: '/bank-logos/bankofamerica.png' },
+  { name: 'Wells Fargo Bank', domain: 'wellsfargo.com', logoUrl: '/bank-logos/wellsfargo.png' },
+  { name: 'Capital One', domain: 'capitalone.com', logoUrl: '/bank-logos/capitalone.png' },
+  { name: 'American Express', domain: 'americanexpress.com', logoUrl: '/bank-logos/americanexpress.png' },
+  { name: 'Citibank', domain: 'citi.com', logoUrl: '/bank-logos/citi.png' },
+  { name: 'Fidelity Inv & Retirement', domain: 'fidelity.com', logoUrl: '/bank-logos/fidelity.png' },
+  { name: 'Discover Credit Card', domain: 'discover.com', logoUrl: '/bank-logos/discover.png' },
+  { name: 'Robinhood', domain: 'robinhood.com', logoUrl: '/bank-logos/robinhood.png' },
+  { name: 'Chime', domain: 'chime.com', logoUrl: '/bank-logos/chime.png' },
+  { name: 'Charles Schwab', domain: 'schwab.com', logoUrl: '/bank-logos/charlesschwab.png' },
+  { name: 'Navy Federal Credit Union', domain: 'navyfederal.org', logoUrl: '/bank-logos/navyfederal.png' },
 ]
 
 const COUNTRIES = [
