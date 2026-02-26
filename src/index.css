@@ -14,6 +14,9 @@
   --green: #0f7b4a;
   --red: #c53030;
   --gray: #8c8c8c;
+  --debt-credit: #c53030;
+  --debt-mortgage: #2d3748;
+  --debt-student: #805ad5;
   --radius: 6px;
   --shadow: 0 1px 2px rgba(0,0,0,.04);
   --font: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -1031,6 +1034,10 @@ tr:hover td {
   max-width: 520px;
 }
 
+.onboarding-card-quotes {
+  max-width: 720px;
+}
+
 .onboarding-layout-welcome {
   background: #f5f5f7;
 }
@@ -1534,26 +1541,76 @@ select.onboarding-input {
   text-decoration: underline;
 }
 
-.onboarding-testimonials {
+.onboarding-all-set-block {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.onboarding-all-set-title {
+  margin: 0 0 0.5rem;
+  font-size: 2.25rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.onboarding-all-set-check {
+  flex-shrink: 0;
+  color: var(--green);
+  line-height: 1;
+}
+
+.onboarding-all-set-check svg {
+  width: 3.5rem;
+  height: 3.5rem;
+}
+
+.onboarding-quotes-heading {
+  margin: 0 0 1.5rem;
+  font-size: 1.2rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  letter-spacing: -0.02em;
+  text-align: center;
+}
+
+.onboarding-testimonials {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 1.25rem;
   margin-bottom: 1.75rem;
 }
 
 .onboarding-testimonial-card {
+  flex: 1 1 200px;
+  min-width: 200px;
+  max-width: 280px;
   padding: 1.5rem 1.25rem;
-  background: #ffffff;
-  border-radius: var(--radius);
-  border: 1px solid #d0ccc7;
-  border-left: 4px solid var(--primary);
+  background: #f5f5f7;
+  border-radius: 12px;
+  border: none;
   text-align: left;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.onboarding-testimonial-stars {
+  display: flex;
+  gap: 0.2rem;
+  margin-bottom: 0.75rem;
+}
+
+.onboarding-star {
+  color: #e8a0a8;
+  font-size: 1.1rem;
 }
 
 .onboarding-testimonial-quote {
   margin: 0 0 0.75rem;
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 500;
   color: var(--text);
   line-height: 1.5;
@@ -1561,7 +1618,7 @@ select.onboarding-input {
 
 .onboarding-testimonial-author {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: var(--text-muted);
   font-weight: 500;
 }
@@ -1569,4 +1626,246 @@ select.onboarding-input {
 .onboarding-cta {
   width: 100%;
   padding: 0.75rem 1.5rem;
+}
+
+/* Goals page */
+.goals-page {
+  padding: 0 0 2rem;
+}
+
+.goals-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.goals-title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.goals-form-card {
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  max-width: 420px;
+}
+
+.goals-form-title {
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.goals-form-row {
+  margin-bottom: 1rem;
+}
+
+.goals-form-row label {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-bottom: 0.35rem;
+}
+
+.goals-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+}
+
+.goals-form-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.goals-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.goals-card {
+  padding: 1.5rem;
+}
+
+.goals-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.goals-card-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.goals-card-actions {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.goals-btn-icon {
+  padding: 0.35rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  opacity: 0.8;
+}
+
+.goals-btn-icon:hover {
+  opacity: 1;
+}
+
+/* Target goal: long bar */
+.goals-target-wrap {
+  margin-top: 0.5rem;
+}
+
+.goals-target-bar {
+  width: 100%;
+  height: 28px;
+  background: #e8e8e8;
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.goals-target-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: var(--radius);
+  transition: width 0.2s ease;
+}
+
+.goals-target-label {
+  margin: 0.5rem 0 0;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+/* Monthly goal: bar chart */
+.goals-monthly-wrap {
+  margin-top: 0.5rem;
+}
+
+.goals-monthly-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  min-height: 160px;
+  padding: 0.5rem 0;
+}
+
+.goals-monthly-bar-cell {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.goals-monthly-bar-wrap {
+  width: 100%;
+  height: 120px;
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: #f0f0f0;
+  border-radius: 4px;
+}
+
+.goals-monthly-bar {
+  width: 60%;
+  min-height: 4px;
+  background: #b0b0b0;
+  border-radius: 4px 4px 0 0;
+  transition: height 0.2s ease;
+}
+
+.goals-monthly-bar.goals-monthly-bar-met {
+  background: rgba(15, 123, 74, 0.5);
+}
+
+.goals-monthly-goal-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #333;
+  z-index: 1;
+}
+
+.goals-monthly-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.goals-monthly-amount {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.goals-monthly-legend {
+  margin: 0.75rem 0 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.goals-form-hint {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+/* Goals: Debt over time stacked bar chart (Recharts) */
+.goals-debt-card {
+  margin-bottom: 1.5rem;
+}
+
+.goals-debt-subtitle {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.goals-debt-chart-wrap {
+  height: 300px;
+}
+
+.goals-debt-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  justify-content: center;
+}
+
+.goals-debt-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--text);
+}
+
+.goals-debt-legend-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
 }

@@ -48,9 +48,9 @@ const COUNTRIES = [
 ]
 
 const TESTIMONIALS = [
-  { quote: 'Finally feel in control of my spending.', author: 'Sarah M.' },
-  { quote: 'Simple and actually works.', author: 'James K.' },
-  { quote: 'Best decision for our household budget.', author: 'The Lee family' },
+  { quote: 'A game changer for my budget.', author: 'Chicagosnow1' },
+  { quote: 'No more guessing where my money goes.', author: 'nnnoah25' },
+  { quote: 'Legitimately the best budget app.', author: 'r_x_rx' },
 ]
 
 function AppleIcon() {
@@ -185,7 +185,7 @@ export default function Onboarding() {
       <div
         className={`onboarding-card ${step === 0 ? 'onboarding-card-welcome' : ''} ${
           step === 6 ? 'onboarding-card-wide' : ''
-        }`}
+        } ${step === 7 ? 'onboarding-card-quotes' : ''}`}
       >
         {step > 0 && (
           <div className="onboarding-progress-wrap">
@@ -460,13 +460,25 @@ export default function Onboarding() {
         {/* Step 7: Quotes */}
         {step === 7 && (
           <>
-            <h1 className="onboarding-title">You're all set</h1>
-            <p className="onboarding-subtitle">Here's what others are saying.</p>
+            <div className="onboarding-all-set-block">
+              <h1 className="onboarding-title onboarding-all-set-title">You're all set</h1>
+              <div className="onboarding-all-set-check" aria-hidden>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+              </div>
+            </div>
+            <p className="onboarding-quotes-heading">They love it, so will you</p>
             <div className="onboarding-testimonials">
               {TESTIMONIALS.map((t, index) => (
                 <div key={index} className="onboarding-testimonial-card">
+                  <div className="onboarding-testimonial-stars" aria-label="5 stars">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <span key={i} className="onboarding-star" aria-hidden>★</span>
+                    ))}
+                  </div>
                   <p className="onboarding-testimonial-quote">"{t.quote}"</p>
-                  <p className="onboarding-testimonial-author">— {t.author}</p>
+                  <p className="onboarding-testimonial-author">{t.author}</p>
                 </div>
               ))}
             </div>

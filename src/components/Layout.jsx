@@ -59,6 +59,9 @@ export default function Layout({ children }) {
           <NavLink to="/reports" className="sidebar-link-with-icon">
             <span className="sidebar-menu-icon">📈</span> Reports
           </NavLink>
+          <NavLink to="/goals" className="sidebar-link-with-icon">
+            <span className="sidebar-menu-icon">🎯</span> Goals
+          </NavLink>
           <NavLink to="/plan" className="sidebar-link-with-icon">
             <span className="sidebar-menu-icon">📋</span> Plan
           </NavLink>

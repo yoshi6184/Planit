@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard'
 import TransactionsSummary from './pages/TransactionsSummary'
 import AccountPage from './pages/AccountPage'
 import Reports from './pages/Reports'
+import Goals from './pages/Goals'
 
 export default function App() {
   const { state } = useApp()
@@ -29,6 +30,8 @@ export default function App() {
         <Route path="/transactions" element={<TransactionsSummary />} />
         <Route path="/transactions/accounts/:accountId" element={<AccountPage />} />
         <Route path="/reports" element={<Reports />} />
+        <Route path="/goals" element={<Goals />} />
+        <Route path="/plan" element={<Plan />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </Layout>
