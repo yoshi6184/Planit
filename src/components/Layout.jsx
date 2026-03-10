@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
-import { getAccountEmoji } from '../data/mockData'
 import Logo from './Logo'
+import { AccountIcon } from './AccountIcons'
+import { IconHome, IconTransactions, IconReports, IconPlan, IconTasks } from './SidebarIcons'
 
 export default function Layout({ children }) {
   const { state } = useApp()
@@ -28,9 +29,9 @@ export default function Layout({ children }) {
         <div className="sidebar-header">
           <Logo className="sidebar-logo" />
         </div>
-        <nav>
-          <NavLink to="/dashboard" end className="sidebar-link-with-icon">
-            <span className="sidebar-menu-icon">🏠</span> Dashboard
+        <nav className="sidebar-main-nav">
+          <NavLink to="/dashboard" end className={({ isActive }) => `sidebar-link-with-icon${isActive ? ' active' : ''}`}>
+            <span className="sidebar-menu-icon"><IconHome /></span> Home
           </NavLink>
           <div className="sidebar-section">
             <NavLink
@@ -39,7 +40,7 @@ export default function Layout({ children }) {
               className={({ isActive }) => `sidebar-transactions-link ${isActive || isTransactions ? 'active' : ''}`}
               onClick={handleTransactionsClick}
             >
-              <span className="sidebar-menu-icon">💸</span> Transactions
+              <span className="sidebar-menu-icon"><IconTransactions /></span> Transactions
             </NavLink>
             {isTransactions && transactionsExpanded && (
               <div className="sidebar-accounts">
@@ -49,21 +50,21 @@ export default function Layout({ children }) {
                     to={`/transactions/accounts/${acc.id}`}
                     className="sidebar-account-link"
                   >
-                    <span className="sidebar-account-emoji">{getAccountEmoji(acc.type)}</span>
+                    <span className="sidebar-account-icon"><AccountIcon type={acc.type} /></span>
                     {acc.name}
                   </NavLink>
                 ))}
               </div>
             )}
           </div>
-          <NavLink to="/reports" className="sidebar-link-with-icon">
-            <span className="sidebar-menu-icon">📈</span> Reports
+          <NavLink to="/reports" className={({ isActive }) => `sidebar-link-with-icon${isActive ? ' active' : ''}`}>
+            <span className="sidebar-menu-icon"><IconReports /></span> Reports
           </NavLink>
-          <NavLink to="/goals" className="sidebar-link-with-icon">
-            <span className="sidebar-menu-icon">🎯</span> Goals
+          <NavLink to="/plan" className={({ isActive }) => `sidebar-link-with-icon${isActive ? ' active' : ''}`}>
+            <span className="sidebar-menu-icon"><IconPlan /></span> Plan
           </NavLink>
-          <NavLink to="/plan" className="sidebar-link-with-icon">
-            <span className="sidebar-menu-icon">📋</span> Plan
+          <NavLink to="/tasks" className={({ isActive }) => `sidebar-link-with-icon${isActive ? ' active' : ''}`}>
+            <span className="sidebar-menu-icon"><IconTasks /></span> Tasks
           </NavLink>
         </nav>
       </aside>

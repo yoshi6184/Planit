@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+import { ComposedChart, Line, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { useApp } from '../context/AppContext'
 import { ACCOUNT_TYPES } from '../context/AppContext'
 import { formatCurrency } from '../utils/format'
@@ -12,6 +12,7 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const [showAddAccount, setShowAddAccount] = useState(false)
   const [newAccount, setNewAccount] = useState({ name: '', type: 'checking' })
+  const [hideBalances, setHideBalances] = useState(false)
 
   const { monthlyIncome, categories, categoryBudgets, accounts, transactions, quote } = state
 
@@ -19,6 +20,8 @@ export default function Dashboard() {
     () => accounts.reduce((sum, a) => sum + (a.balance || 0), 0),
     [accounts]
   )
+
+  const formatMaybeHidden = (value) => (hideBalances ? '••••••' : formatCurrency(value))
 
   const netWorthChange30 = useMemo(() => {
     const past = new Date()
@@ -61,6 +64,8 @@ export default function Dashboard() {
 
   const spendVsBudgetPct = totalBudgeted > 0 ? Math.min(100, (totalSpent / totalBudgeted) * 100) : 0
 
+  const TREND_MONTHS = ['2024-11', '2024-12', '2025-01', '2025-02']
+
   const monthlyTrend = useMemo(() => {
     const byMonth = {}
     transactions.forEach((t) => {
@@ -68,7 +73,7 @@ export default function Dashboard() {
       const month = t.date.slice(0, 7)
       byMonth[month] = (byMonth[month] || 0) + Math.abs(t.amount)
     })
-    return ['2024-11', '2024-12', '2025-01', '2025-02'].map((m) => ({
+    return TREND_MONTHS.map((m) => ({
       month: m,
       spent: byMonth[m] || 0,
       budget: monthlyIncome || 0,
@@ -124,7 +129,8 @@ export default function Dashboard() {
     .filter((r) => r.spent > 0)
     .map((r) => ({ name: r.name, value: r.spent }))
   const totalSpentPie = useMemo(() => pieData.reduce((s, d) => s + d.value, 0), [pieData])
-  const PIE_COLORS = ['#475569', '#64748b', '#0d9488', '#059669', '#0284c7', '#2563eb', '#4f46e5', '#6d28d9', '#7c3aed', '#9d174d']
+  const PIE_COLORS_OTHER = ['#64748b', '#0d9488', '#059669', '#0284c7', '#94a3b8', '#475569', '#0f766e', '#0369a1', '#1e40af', '#6b7280']
+  const getPieColor = (index) => (index === 0 ? '#5B6ADF' : PIE_COLORS_OTHER[(index - 1) % PIE_COLORS_OTHER.length])
 
   const getAccountTypeLabel = (typeId) => ACCOUNT_TYPES.find((t) => t.id === typeId)?.label || typeId
   const getCategoryName = (categoryId) => categories.find((c) => c.id === categoryId)?.name || '—'
@@ -166,8 +172,60 @@ export default function Dashboard() {
   }
 
   return (
-    <div>
-      <h1 style={{ margin: '0 0 1rem', fontSize: '1.35rem', fontWeight: 600 }}>Dashboard</h1>
+    <div className="dashboard-page">
+      <header className="dashboard-topbar">
+        <div className="dashboard-topbar-spacer" />
+        <div className="dashboard-topbar-right">
+          <div className="dashboard-topbar-search-wrap">
+            <div className="dashboard-search">
+              <span className="dashboard-search-icon" aria-hidden>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="m21 21-4.35-4.35" />
+                </svg>
+              </span>
+              <input
+                type="search"
+                className="dashboard-search-input"
+                placeholder="Search for anything"
+              />
+              <kbd className="dashboard-search-kbd">Ctrl K</kbd>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="dashboard-eye-toggle"
+            onClick={() => setHideBalances((v) => !v)}
+            aria-label={hideBalances ? 'Show balances' : 'Hide balances'}
+          >
+            {hideBalances ? (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                <line x1="1" y1="1" x2="23" y2="23" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            )}
+          </button>
+          <button type="button" className="dashboard-notify-btn" aria-label="Notifications">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            </svg>
+          </button>
+          <button type="button" className="btn dashboard-topbar-btn">
+            Move money
+          </button>
+          <button type="button" className="dashboard-avatar" aria-label="Profile">
+            {(state.user && state.user.initials) || 'JP'}
+          </button>
+        </div>
+      </header>
+
+      <h1 className="dashboard-greeting">Hello, David</h1>
 
       <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-start' }}>
         {/* Left: accounts, net worth, action checklist */}
@@ -196,7 +254,8 @@ export default function Dashboard() {
                     <div className="dashboard-account-meta">
                       <span className="dashboard-account-type">{getAccountTypeLabel(acc.type)}</span>
                       <span className={`dashboard-account-value ${(acc.balance || 0) >= 0 ? 'amount-positive' : acc.type === 'credit' ? 'amount-negative' : 'amount-spent'}`}>
-                        {acc.balance >= 0 ? '' : '-'}{formatCurrency(Math.abs(acc.balance || 0))}
+                        {acc.balance >= 0 ? '' : '-'}
+                        {formatMaybeHidden(Math.abs(acc.balance || 0))}
                       </span>
                     </div>
                   </button>
@@ -233,7 +292,7 @@ export default function Dashboard() {
           <div className="card" style={{ marginBottom: '1rem', padding: '1rem 1.25rem' }}>
             <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Net worth</div>
             <div style={{ fontSize: '1.5rem', fontWeight: 700 }} className={totalAccounts >= 0 ? 'amount-positive' : 'amount-spent'}>
-              {formatCurrency(totalAccounts)}
+              {formatMaybeHidden(totalAccounts)}
             </div>
             <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
               {netWorthChange30 >= 0 ? 'Up' : 'Down'} {formatCurrency(Math.abs(netWorthChange30))} from last 30 days
@@ -303,12 +362,19 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Line chart: aggregate over time vs budget */}
-        <div className="card" style={{ marginBottom: '1.5rem' }}>
+        {/* Line chart: aggregate over time vs budget */}
+        <div className="card" style={{ marginBottom: '1rem' }}>
           <h2 style={{ margin: '0 0 1rem', fontSize: '1rem', fontWeight: 600 }}>Spending over time vs budget</h2>
           <div style={{ height: 260 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={monthlyTrend} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+              <ComposedChart data={monthlyTrend} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="dashboardSpendingLineGradient" x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox">
+                    <stop offset="0%" stopColor="#BFC4FF" stopOpacity={1} />
+                    <stop offset="50%" stopColor="#E0E4FF" stopOpacity={1} />
+                    <stop offset="100%" stopColor="#F6F8FF" stopOpacity={1} />
+                  </linearGradient>
+                </defs>
                 <XAxis
                   dataKey="month"
                   tick={{ fontSize: 11 }}
@@ -318,7 +384,7 @@ export default function Dashboard() {
                     return d.toLocaleDateString('en-US', { month: 'short' })
                   }}
                 />
-                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => formatCurrency(v)} stroke="#8c8c8c" />
+                <YAxis type="number" domain={[0, 'auto']} tick={{ fontSize: 11 }} tickFormatter={(v) => formatCurrency(v)} stroke="#8c8c8c" />
                 <Tooltip
                   formatter={(v) => [formatCurrency(v)]}
                   labelFormatter={(l) => {
@@ -326,10 +392,54 @@ export default function Dashboard() {
                     return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
                   }}
                 />
-                <Line type="monotone" dataKey="spent" stroke="#9ca3af" strokeWidth={2} dot={{ r: 4 }} name="Spent" />
+                <Area type="monotone" dataKey="spent" fill="url(#dashboardSpendingLineGradient)" fillOpacity={1} stroke="none" baseValue={0} />
+                <Line type="monotone" dataKey="spent" stroke="#7B85F7" strokeWidth={2} dot={{ r: 4 }} name="Spent" />
                 <Line type="monotone" dataKey="budget" stroke="#6b7280" strokeWidth={2} strokeDasharray="5 5" dot={false} name="Budget" />
-              </LineChart>
+              </ComposedChart>
             </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Summary from reports + bars (budget, activity, available) */}
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <h2 style={{ margin: '0 0 1rem', fontSize: '1rem', fontWeight: 600 }}>Summary by category</h2>
+          <div className="table-wrap">
+            <table className="dashboard-summary-table">
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th className="dashboard-summary-bar-th"></th>
+                  <th style={{ textAlign: 'right', width: 90 }}>Budget</th>
+                  <th style={{ textAlign: 'right', width: 90 }}>Activity</th>
+                  <th style={{ textAlign: 'right', width: 90 }}>Available</th>
+                </tr>
+              </thead>
+              <tbody>
+                {categorySpendAllTime.slice(0, 12).map((r) => {
+                  const monthSpent = thisMonthSpendByCategory.find((x) => x.id === r.id)?.spent ?? 0
+                  const budget = r.budget || 0
+                  const available = budget - monthSpent
+                  const pctSpent = budget > 0 ? Math.min(100, (monthSpent / budget) * 100) : 0
+                  const pctAvail = budget > 0 ? Math.max(0, 100 - pctSpent) : 0
+                  return (
+                    <tr key={r.id}>
+                      <td>{r.name}</td>
+                      <td>
+                        <div className="dashboard-summary-bar">
+                          <div className="dashboard-summary-bar-spent" style={{ width: `${pctSpent}%` }} />
+                          <div className="dashboard-summary-bar-avail" style={{ width: `${pctAvail}%` }} />
+                        </div>
+                      </td>
+                      <td style={{ textAlign: 'right' }}>{formatCurrency(budget)}</td>
+                      <td style={{ textAlign: 'right' }} className="amount-spent">{formatCurrency(monthSpent)}</td>
+                      <td style={{ textAlign: 'right' }} className={available >= 0 ? 'amount-positive' : 'amount-negative'}>
+                        {formatCurrency(available)}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
 
@@ -364,7 +474,7 @@ export default function Dashboard() {
                       }}
                     >
                       {pieData.map((_, i) => (
-                        <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} stroke="none" />
+                        <Cell key={i} fill={getPieColor(i)} stroke="none" />
                       ))}
                     </Pie>
                     <Tooltip formatter={(v) => [formatCurrency(v)]} />
@@ -406,49 +516,6 @@ export default function Dashboard() {
                 </div>
               </>
             )}
-          </div>
-        </div>
-
-        {/* Summary from reports + bars (budget, activity, available) */}
-        <div className="card">
-          <h2 style={{ margin: '0 0 1rem', fontSize: '1rem', fontWeight: 600 }}>Summary by category</h2>
-          <div className="table-wrap">
-            <table className="dashboard-summary-table">
-              <thead>
-                <tr>
-                  <th>Category</th>
-                  <th className="dashboard-summary-bar-th"></th>
-                  <th style={{ textAlign: 'right', width: 90 }}>Budget</th>
-                  <th style={{ textAlign: 'right', width: 90 }}>Activity</th>
-                  <th style={{ textAlign: 'right', width: 90 }}>Available</th>
-                </tr>
-              </thead>
-              <tbody>
-                {categorySpendAllTime.slice(0, 12).map((r) => {
-                  const monthSpent = thisMonthSpendByCategory.find((x) => x.id === r.id)?.spent ?? 0
-                  const budget = r.budget || 0
-                  const available = budget - monthSpent
-                  const pctSpent = budget > 0 ? Math.min(100, (monthSpent / budget) * 100) : 0
-                  const pctAvail = budget > 0 ? Math.max(0, 100 - pctSpent) : 0
-                  return (
-                    <tr key={r.id}>
-                      <td>{r.name}</td>
-                      <td>
-                        <div className="dashboard-summary-bar">
-                          <div className="dashboard-summary-bar-spent" style={{ width: `${pctSpent}%` }} />
-                          <div className="dashboard-summary-bar-avail" style={{ width: `${pctAvail}%` }} />
-                        </div>
-                      </td>
-                      <td style={{ textAlign: 'right' }}>{formatCurrency(budget)}</td>
-                      <td style={{ textAlign: 'right' }} className="amount-spent">{formatCurrency(monthSpent)}</td>
-                      <td style={{ textAlign: 'right' }} className={available >= 0 ? 'amount-positive' : 'amount-negative'}>
-                        {formatCurrency(available)}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
           </div>
         </div>
         </div>

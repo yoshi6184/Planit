@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
-import { XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts'
+import { XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, ComposedChart, Line, Area } from 'recharts'
 import { useApp } from '../context/AppContext'
-import { MOCK_SUBSCRIPTIONS } from '../data/mockData'
+import { MOCK_SUBSCRIPTIONS, DEFAULT_DEBT_BY_MONTH } from '../data/mockData'
 import { formatCurrency } from '../utils/format'
 
 // Neutral-first palette: biggest spend categories use greys, then accents
@@ -23,10 +23,13 @@ const STACK_COLORS = [
   '#dc2626',
 ]
 
+const MONTHS = ['2024-11', '2024-12', '2025-01', '2025-02']
+
 const REPORT_TABS = [
   { id: 'spending', label: 'Spending Trends' },
   { id: 'networth', label: 'Net Worth' },
   { id: 'income-expense', label: 'Income vs Expense' },
+  { id: 'debt', label: 'Debt over time' },
   { id: 'subscriptions', label: 'Subscription Tracker' },
 ]
 
@@ -92,6 +95,28 @@ export default function Reports() {
     [accounts]
   )
 
+  const netWorthTrend = useMemo(() => {
+    const netChangeByMonth = {}
+    transactions.forEach((t) => {
+      const month = t.date.slice(0, 7)
+      if (!MONTHS.includes(month)) return
+      netChangeByMonth[month] = (netChangeByMonth[month] || 0) + (t.amount || 0)
+    })
+
+    const netWorthByMonth = {}
+    let running = netWorth
+    for (let i = MONTHS.length - 1; i >= 0; i -= 1) {
+      const m = MONTHS[i]
+      netWorthByMonth[m] = running
+      running -= netChangeByMonth[m] || 0
+    }
+
+    return MONTHS.map((m) => ({
+      month: m,
+      netWorth: netWorthByMonth[m],
+    }))
+  }, [transactions, netWorth])
+
   const totalMonthlySubscriptions = useMemo(
     () => MOCK_SUBSCRIPTIONS.reduce((sum, s) => sum + s.pricePerMonth, 0),
     []
@@ -103,7 +128,16 @@ export default function Reports() {
   const subscriptionCount = MOCK_SUBSCRIPTIONS.length
   const activeSubscriptionCount = MOCK_SUBSCRIPTIONS.filter((s) => s.active !== false).length
 
-  const MONTHS = ['2024-11', '2024-12', '2025-01', '2025-02']
+  const debtChartData = useMemo(() => {
+    const entries = Object.entries(DEFAULT_DEBT_BY_MONTH || {}).sort(([a], [b]) => (a < b ? -1 : 1))
+    return entries.map(([month, v]) => ({
+      month,
+      'Credit card': v.creditCard ?? 0,
+      'Student loans': v.studentLoans ?? 0,
+    }))
+  }, [])
+
+  const formatWholeCurrency = (n) => '$' + Math.round(n || 0).toLocaleString('en-US')
 
   const averageMonthlySpend = useMemo(() => {
     if (monthlyTrend.length === 0) return 0
@@ -280,35 +314,72 @@ export default function Reports() {
       )}
 
       {activeTab === 'networth' && (
-        <div className="card">
-          <h2 style={{ margin: '0 0 1rem', fontSize: '1.1rem' }}>Net worth</h2>
-          <p style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0 0 0.5rem' }}>
-            {formatCurrency(netWorth)}
-          </p>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1rem' }}>
-            Sum of all account balances
-          </p>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Account</th>
-                  <th style={{ textAlign: 'right' }}>Balance</th>
-                </tr>
-              </thead>
-              <tbody>
-                {accounts.map((acc) => (
-                  <tr key={acc.id}>
-                    <td>{acc.name}</td>
-                    <td style={{ textAlign: 'right' }} className={acc.balance >= 0 ? 'amount-positive' : 'amount-negative'}>
-                      {formatCurrency(acc.balance || 0)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <>
+          <div className="card" style={{ marginBottom: '1.5rem' }}>
+            <h2 style={{ margin: '0 0 1rem', fontSize: '1.1rem' }}>Net worth over time</h2>
+            <div style={{ height: 260 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={netWorthTrend} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="reportsNetWorthGradient" x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox">
+                      <stop offset="0%" stopColor="#BFC4FF" stopOpacity={1} />
+                      <stop offset="50%" stopColor="#E0E4FF" stopOpacity={1} />
+                      <stop offset="100%" stopColor="#F6F8FF" stopOpacity={1} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis
+                    dataKey="month"
+                    tick={{ fontSize: 11 }}
+                    stroke="#8c8c8c"
+                    tickFormatter={(val) => {
+                      const d = new Date(val + '-01')
+                      return d.toLocaleDateString('en-US', { month: 'short' })
+                    }}
+                  />
+                  <YAxis type="number" domain={['auto', 'auto']} tick={{ fontSize: 11 }} tickFormatter={(v) => formatCurrency(v)} stroke="#8c8c8c" />
+                  <Tooltip
+                    formatter={(v) => [formatCurrency(v)]}
+                    labelFormatter={(l) => {
+                      const d = new Date(l + '-01')
+                      return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+                    }}
+                  />
+                  <Area type="monotone" dataKey="netWorth" fill="url(#reportsNetWorthGradient)" fillOpacity={1} stroke="none" baseValue="dataMin" />
+                  <Line type="monotone" dataKey="netWorth" stroke="#7B85F7" strokeWidth={2} dot={{ r: 4 }} name="Net worth" />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
           </div>
-        </div>
+          <div className="card">
+            <h2 style={{ margin: '0 0 1rem', fontSize: '1.1rem' }}>Net worth breakdown</h2>
+            <p style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0 0 0.5rem' }}>
+              {formatCurrency(netWorth)}
+            </p>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1rem' }}>
+              Sum of all account balances
+            </p>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Account</th>
+                    <th style={{ textAlign: 'right' }}>Balance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {accounts.map((acc) => (
+                    <tr key={acc.id}>
+                      <td>{acc.name}</td>
+                      <td style={{ textAlign: 'right' }} className={acc.balance >= 0 ? 'amount-positive' : 'amount-negative'}>
+                        {formatCurrency(acc.balance || 0)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
       )}
 
       {activeTab === 'income-expense' && (
@@ -359,6 +430,47 @@ export default function Reports() {
                 </tr>
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'debt' && debtChartData.length > 0 && (
+        <div className="card goals-debt-card">
+          <h2 style={{ margin: '0 0 0.25rem', fontSize: '1.1rem' }}>Debt over time</h2>
+          <p className="goals-debt-subtitle">Stacked bars by month. Hover for amounts.</p>
+          <div className="goals-debt-chart-wrap">
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={debtChartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} barCategoryGap="25%">
+                <XAxis
+                  dataKey="month"
+                  tick={{ fontSize: 11 }}
+                  tickFormatter={(val) => {
+                    const d = new Date(val + '-01')
+                    return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+                  }}
+                />
+                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => formatWholeCurrency(v)} />
+                <Tooltip
+                  formatter={(v) => [formatWholeCurrency(v)]}
+                  labelFormatter={(label) => {
+                    const d = new Date(label + '-01')
+                    return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+                  }}
+                />
+                <Bar dataKey="Credit card" stackId="debt" fill="var(--debt-credit)" name="Credit card" />
+                <Bar dataKey="Student loans" stackId="debt" fill="var(--debt-student)" name="Student loans" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="goals-debt-legend">
+            <span className="goals-debt-legend-item">
+              <span className="goals-debt-legend-swatch" style={{ background: 'var(--debt-credit)' }} />
+              Credit card
+            </span>
+            <span className="goals-debt-legend-item">
+              <span className="goals-debt-legend-swatch" style={{ background: 'var(--debt-student)' }} />
+              Student loans
+            </span>
           </div>
         </div>
       )}

@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { formatCurrency } from '../utils/format'
 import { ACCOUNT_TYPES } from '../context/AppContext'
-import { getAccountEmoji } from '../data/mockData'
+import { AccountIcon } from '../components/AccountIcons'
 
 export default function AccountPage() {
   const { accountId } = useParams()
@@ -19,8 +19,10 @@ export default function AccountPage() {
     amount: '',
     categoryId: '',
     cleared: true,
+    receiptName: '',
   })
   const [importText, setImportText] = useState('')
+  const receiptInputRef = useRef(null)
 
   const account = accounts.find((a) => a.id === accountId)
   const accountTx = useMemo(
@@ -28,19 +30,74 @@ export default function AccountPage() {
     [transactions, accountId]
   )
 
-  const balances = useMemo(() => {
-    let cleared = 0
-    let uncleared = 0
+  const CURRENT_MONTH = '2025-02'
+  const PREVIOUS_MONTH = '2025-01'
+
+  const monthStatsByMonth = useMemo(() => {
+    const months = [PREVIOUS_MONTH, CURRENT_MONTH]
+    const init = months.reduce((acc, m) => {
+      acc[m] = { spent: 0, earned: 0 }
+      return acc
+    }, {})
+
     accountTx.forEach((t) => {
+      const month = t.date?.slice(0, 7)
+      if (!months.includes(month)) return
       const amt = t.amount || 0
-      if (t.cleared) cleared += amt
-      else uncleared += amt
+      if (amt < 0) {
+        init[month].spent += Math.abs(amt)
+      } else if (amt > 0) {
+        init[month].earned += amt
+      }
     })
-    return { cleared, uncleared, working: cleared + uncleared }
+
+    return init
   }, [accountTx])
+
+  const currentStats = monthStatsByMonth[CURRENT_MONTH] || { spent: 0, earned: 0 }
+  const previousStats = monthStatsByMonth[PREVIOUS_MONTH] || { spent: 0, earned: 0 }
+
+  const balance = account?.balance ?? 0
+  const netChangeThisMonth = currentStats.earned - currentStats.spent
+  const previousBalance = balance - netChangeThisMonth
+
+  const pctChange = (current, previous) => {
+    if (previous === 0 && current === 0) return 0
+    if (!previous) return null
+    const diff = current - previous
+    return (diff / Math.abs(previous)) * 100
+  }
+
+  const balanceChangePct = pctChange(balance, previousBalance)
+  const spentChangePct = pctChange(currentStats.spent, previousStats.spent)
+  const earnedChangePct = pctChange(currentStats.earned, previousStats.earned)
 
   const getCategoryName = (id) => categories.find((c) => c.id === id)?.name || '—'
   const getAccountTypeLabel = (typeId) => ACCOUNT_TYPES.find((t) => t.id === typeId)?.label || typeId
+
+  const handleVoicePayee = () => {
+    if (typeof window === 'undefined') return
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SpeechRecognition) {
+      // Graceful no-op if browser doesn't support speech recognition
+      return
+    }
+    const recognition = new SpeechRecognition()
+    recognition.lang = 'en-US'
+    recognition.interimResults = false
+    recognition.maxAlternatives = 1
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript
+      setNewTx((prev) => ({ ...prev, payee: transcript }))
+    }
+    recognition.start()
+  }
+
+  const handleReceiptChange = (e) => {
+    const file = e.target.files && e.target.files[0]
+    if (!file) return
+    setNewTx((prev) => ({ ...prev, receiptName: file.name }))
+  }
 
   const handleAddTransaction = (e) => {
     e.preventDefault()
@@ -55,6 +112,7 @@ export default function AccountPage() {
         categoryId: newTx.categoryId || null,
         accountId,
         cleared: newTx.cleared,
+        receiptName: newTx.receiptName || null,
       },
     })
     setNewTx({
@@ -63,6 +121,7 @@ export default function AccountPage() {
       amount: '',
       categoryId: '',
       cleared: true,
+      receiptName: '',
     })
     setShowAdd(false)
   }
@@ -78,13 +137,14 @@ export default function AccountPage() {
       const cleared = parts[4] !== 'false' && parts[4] !== '0'
       return { id: 'imp' + Date.now() + i, date, payee, amount, categoryId, accountId, cleared }
     })
-  const handleReconcile = () => {
-    dispatch({ type: 'RECONCILE_ACCOUNT', payload: accountId })
-  }
 
     dispatch({ type: 'IMPORT_TRANSACTIONS', payload: imported })
     setImportText('')
     setShowImport(false)
+  }
+
+  const handleReconcile = () => {
+    dispatch({ type: 'RECONCILE_ACCOUNT', payload: accountId })
   }
 
   if (!account) {
@@ -99,30 +159,97 @@ export default function AccountPage() {
   }
 
   return (
-    <div>
-      <h1 style={{ margin: '0 0 0.5rem', fontSize: '1.35rem', fontWeight: 600 }}>
-        <span style={{ marginRight: '0.35rem' }}>{getAccountEmoji(account.type)}</span>
+    <div className="transactions-page">
+      <h1 className="transactions-title" style={{ margin: '0 0 0.5rem' }}>
+        <span className="account-page-icon" style={{ marginRight: '0.35rem' }}><AccountIcon type={account.type} /></span>
         {account.name}
       </h1>
 
-      {/* Balance: compact single line; reconciled date on same block */}
-      <div className="balance-compact">
-        <span><strong>Cleared</strong> <span className={balances.cleared >= 0 ? 'amount-positive' : 'amount-negative'}>{formatCurrency(balances.cleared)}</span></span>
-        <span style={{ color: 'var(--text-muted)' }}>·</span>
-        <span><strong>Uncleared</strong> <span className={balances.uncleared >= 0 ? 'amount-positive' : 'amount-negative'}>{formatCurrency(balances.uncleared)}</span></span>
-        <span style={{ color: 'var(--text-muted)' }}>·</span>
-        <span><strong>Working</strong> <span className={balances.working >= 0 ? 'amount-positive' : 'amount-negative'}>{formatCurrency(balances.working)}</span></span>
+      {/* Account hero stats */}
+      <div className="account-summary-strip transactions-summary-strip">
+        <div className="transactions-summary-item transactions-summary-item-primary">
+          <div className="transactions-summary-label">Balance</div>
+          <div
+            className={`transactions-summary-value ${
+              balance >= 0 ? 'transactions-summary-value-positive' : 'transactions-summary-value-negative'
+            }`}
+          >
+            {formatCurrency(balance)}
+          </div>
+          <div style={{ fontSize: '0.75rem', color: balanceChangePct !== null ? (balanceChangePct >= 0 ? '#16a34a' : '#b91c1c') : 'var(--text-muted)' }}>
+            {balanceChangePct !== null ? `${balanceChangePct >= 0 ? '+' : ''}${balanceChangePct.toFixed(1)}%` : '—'} vs last month
+          </div>
+        </div>
+        <div className="transactions-summary-item">
+          <div className="transactions-summary-label">Spent this month</div>
+          <div className="transactions-summary-value transactions-summary-value-negative">
+            {formatCurrency(currentStats.spent)}
+          </div>
+          <div style={{ fontSize: '0.75rem', color: spentChangePct !== null ? (spentChangePct >= 0 ? '#b91c1c' : '#16a34a') : 'var(--text-muted)' }}>
+            {spentChangePct !== null ? `${spentChangePct >= 0 ? '+' : ''}${spentChangePct.toFixed(1)}%` : '—'} vs last month
+          </div>
+        </div>
+        <div className="transactions-summary-item">
+          <div className="transactions-summary-label">Earned this month</div>
+          <div className="transactions-summary-value transactions-summary-value-positive">
+            {formatCurrency(currentStats.earned)}
+          </div>
+          <div style={{ fontSize: '0.75rem', color: earnedChangePct !== null ? (earnedChangePct >= 0 ? '#16a34a' : '#b91c1c') : 'var(--text-muted)' }}>
+            {earnedChangePct !== null ? `${earnedChangePct >= 0 ? '+' : ''}${earnedChangePct.toFixed(1)}%` : '—'} vs last month
+          </div>
+        </div>
         {account.lastReconciledAt && (
-          <>
-            <span style={{ color: 'var(--text-muted)' }}>·</span>
-            <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Reconciled {account.lastReconciledAt}</span>
-          </>
+          <div className="transactions-summary-item" style={{ marginLeft: 'auto', paddingTop: '0.25rem' }}>
+            <span className="transactions-summary-label">Last reconciled</span>
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{account.lastReconciledAt}</span>
+          </div>
         )}
       </div>
 
-      <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-        <button type="button" className="btn btn-primary" onClick={() => setShowAdd(true)}>+ Add transaction</button>
-        <button type="button" className="btn btn-secondary" onClick={() => setShowImport(true)}>Import from file</button>
+      <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        <button type="button" className="transactions-pill" onClick={() => setShowAdd(true)}>+ Add transaction</button>
+        <button type="button" className="transactions-pill" onClick={() => setShowImport(true)}>Import from file</button>
+        <button
+          type="button"
+          className="transactions-pill"
+          onClick={handleVoicePayee}
+        >
+          <span className="transactions-pill-icon" aria-hidden>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z" />
+              <path d="M19 10a7 7 0 0 1-14 0" />
+              <path d="M12 17v4" />
+              <path d="M8 21h8" />
+            </svg>
+          </span>
+          Voice input
+        </button>
+        <button
+          type="button"
+          className="transactions-pill"
+          onClick={() => receiptInputRef.current && receiptInputRef.current.click()}
+        >
+          <span className="transactions-pill-icon" aria-hidden>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7" />
+              <path d="M16 3v4h4" />
+              <path d="M16 17l2 2 4-4" />
+            </svg>
+          </span>
+          Upload receipt
+        </button>
+        <input
+          ref={receiptInputRef}
+          type="file"
+          accept="image/*,application/pdf"
+          onChange={handleReceiptChange}
+          style={{ display: 'none' }}
+        />
+        {newTx.receiptName && (
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+            Attached: {newTx.receiptName}
+          </span>
+        )}
       </div>
 
       {showAdd && (
@@ -138,7 +265,7 @@ export default function AccountPage() {
                 style={{ padding: '0.5rem', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}
               />
             </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', minWidth: '200px' }}>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Payee</span>
               <input
                 value={newTx.payee}
@@ -184,14 +311,9 @@ export default function AccountPage() {
                 ))}
               </select>
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', paddingBottom: '0.25rem' }}>
-              <input
-                type="checkbox"
-                checked={newTx.cleared}
-                onChange={(e) => setNewTx((p) => ({ ...p, cleared: e.target.checked }))}
-              />
-              <span style={{ fontSize: '0.85rem' }}>Cleared</span>
-            </label>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', paddingBottom: '0.25rem' }}>
+              All new transactions are treated as cleared.
+            </span>
             <button type="submit" className="btn btn-primary">Save</button>
             <button type="button" className="btn btn-secondary" onClick={() => setShowAdd(false)}>Cancel</button>
           </form>
@@ -229,7 +351,7 @@ export default function AccountPage() {
                 <th>Category</th>
                 <th style={{ textAlign: 'right' }}>Inflow</th>
                 <th style={{ textAlign: 'right' }}>Outflow</th>
-                <th>Cleared</th>
+                <th>Receipt</th>
               </tr>
             </thead>
             <tbody>
@@ -244,7 +366,32 @@ export default function AccountPage() {
                   <td style={{ textAlign: 'right' }} className="amount-negative">
                     {t.amount < 0 ? formatCurrency(Math.abs(t.amount)) : '—'}
                   </td>
-                  <td>{t.cleared ? 'Yes' : 'No'}</td>
+                  <td>
+                    {t.receiptName ? (
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.3rem',
+                          padding: '0.15rem 0.45rem',
+                          borderRadius: '999px',
+                          background: 'rgba(148, 163, 184, 0.12)',
+                          fontSize: '0.75rem',
+                          color: 'var(--text-muted)',
+                          maxWidth: '180px',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                        title={t.receiptName}
+                      >
+                        <span aria-hidden>📎</span>
+                        <span>{t.receiptName}</span>
+                      </span>
+                    ) : (
+                      <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>No receipt</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

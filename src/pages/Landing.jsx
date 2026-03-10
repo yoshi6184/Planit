@@ -2,11 +2,16 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import Logo from '../components/Logo'
 
-/* Viewport-based: page 1 = hero, page 2 = Taste, page 3 = Image by image */
+/* 1=Taste, 2=Image by image, 3=Regardless, 4=Simple/Fast/Secure, 5=Stats (Designed to compound) */
 const getScrollThresholds = () => ({
-  taste: window.innerHeight * 0.45,
-  imageByImage: window.innerHeight * 1.45,
+  taste: window.innerHeight * 0.15,
+  imageByImage: window.innerHeight * 1.2,
+  financialRight: window.innerHeight * 2.0,
+  howItWorksIntro: window.innerHeight * 2.8,
+  statsPage: window.innerHeight * 3.6,
 })
+
+const CYCLING_WORDS = ['age', 'education', 'circumstances', 'race', 'gender', 'income']
 
 const COSMOS_IMAGES = [
   { id: 1, left: '8%', top: '18%', size: 100 },
@@ -34,22 +39,49 @@ const COSMOS_IMAGES = [
 export default function Landing() {
   const [scrolled, setScrolled] = useState(false)
   const [scrolled2, setScrolled2] = useState(false)
+  const [scrolled3, setScrolled3] = useState(false)
+  const [scrolled4, setScrolled4] = useState(false)
+  const [scrolled5, setScrolled5] = useState(false)
+  const [num1, setNum1] = useState(0)
+  const [num2, setNum2] = useState(0)
+  const [num3, setNum3] = useState(0)
   const [page3Key, setPage3Key] = useState(0)
+  const [page4Key, setPage4Key] = useState(0)
+  const [cyclingIndex, setCyclingIndex] = useState(0)
 
   useEffect(() => {
     window.scrollTo(0, 0)
-  }, [])
-
-  useEffect(() => {
+    setScrolled(false)
+    setScrolled2(false)
+    setScrolled3(false)
+    setScrolled4(false)
+    setScrolled5(false)
+    setNum1(0)
+    setNum2(0)
+    setNum3(0)
     const onScroll = () => {
       const y = window.scrollY
-      const { taste, imageByImage } = getScrollThresholds()
+      const { taste, imageByImage, financialRight, howItWorksIntro, statsPage } = getScrollThresholds()
+      if (y <= 0) {
+        setScrolled(false)
+        setScrolled2(false)
+        setScrolled3(false)
+        setScrolled4(false)
+        setScrolled5(false)
+        setNum1(0)
+        setNum2(0)
+        setNum3(0)
+        return
+      }
       setScrolled(y > taste)
       setScrolled2(y > imageByImage)
+      setScrolled3(y > financialRight)
+      setScrolled4(y > howItWorksIntro)
+      setScrolled5(y > statsPage)
     }
-    onScroll()
     window.addEventListener('scroll', onScroll, { passive: true })
     window.addEventListener('resize', onScroll)
+    onScroll()
     return () => {
       window.removeEventListener('scroll', onScroll)
       window.removeEventListener('resize', onScroll)
@@ -60,8 +92,61 @@ export default function Landing() {
     if (scrolled2) setPage3Key((k) => k + 1)
   }, [scrolled2])
 
+  useEffect(() => {
+    if (scrolled3) {
+      setPage4Key((k) => k + 1)
+      setCyclingIndex(0)
+    }
+  }, [scrolled3])
+
+  useEffect(() => {
+    if (!scrolled5) return
+    const duration = 1200
+    const steps = 24
+    const stepMs = duration / steps
+    let step = 0
+    const id = setInterval(() => {
+      step++
+      const t = step / steps
+      const ease = 1 - Math.pow(1 - t, 2)
+      setNum1(Math.round(8 * ease))
+      setNum2(Math.round(30 * ease))
+      setNum3(Math.round(98 * ease))
+      if (step >= steps) {
+        setNum1(8)
+        setNum2(30)
+        setNum3(98)
+        clearInterval(id)
+      }
+    }, stepMs)
+    return () => clearInterval(id)
+  }, [scrolled5])
+
+  useEffect(() => {
+    if (!scrolled3) return
+    const id = setInterval(() => {
+      setCyclingIndex((i) => (i + 1) % CYCLING_WORDS.length)
+    }, 800)
+    return () => clearInterval(id)
+  }, [scrolled3, page4Key])
+
+  const HOW_IT_WORKS_STEPS = [
+    {
+      title: 'Set your budget',
+      description: 'Each dollar should have a purpose.',
+    },
+    {
+      title: 'Log expenses',
+      description: 'Add expenses in seconds with voice input or images. Backfill missed days.',
+    },
+    {
+      title: 'Choose a daily check-in',
+      description: 'Stay in control, sleep better at night and achieve your goals.',
+    },
+  ]
+
   return (
-    <div className={`landing ${scrolled ? 'landing-scrolled' : ''} ${scrolled2 ? 'landing-scrolled-2' : ''}`}>
+    <div className={`landing ${scrolled ? 'landing-scrolled' : ''} ${scrolled2 ? 'landing-scrolled-2' : ''} ${scrolled3 ? 'landing-scrolled-3' : ''} ${scrolled4 ? 'landing-scrolled-4' : ''} ${scrolled5 ? 'landing-scrolled-5' : ''}`}>
       <header className="landing-header">
         <div className="landing-header-inner">
           <div className="landing-header-left">
@@ -70,12 +155,12 @@ export default function Landing() {
             </Link>
             <nav className="landing-nav">
               <Link to="/dashboard" className="landing-nav-link">
-                Who we are
+                Products
               </Link>
               <Link to="/reports" className="landing-nav-link">
                 Who we are
               </Link>
-              <Link to="/goals" className="landing-nav-link">
+              <Link to="/reports" className="landing-nav-link">
                 Learn
               </Link>
             </nav>
@@ -94,25 +179,29 @@ export default function Landing() {
       <main className="landing-hero">
         <div className="landing-hero-inner landing-hero-content">
           <section className="landing-hero-copy">
-            <p className="landing-hero-announce">Announcing $100M Series B by OpenAI</p>
+            <p className="landing-hero-announce">
+              <span className="landing-hero-announce-dot" />
+              Backed by a $100M Series B from OpenAI
+            </p>
             <h1 className="landing-headline">
               Financial freedom
               <br />
               is a <span className="landing-headline-underline">choice</span>
             </h1>
             <p className="landing-subheadline">
-              We're a team of dreamers and builders on a mission to make finance accessible to all.
+              Simplify spending, clarify priorities, and bring more joy to every dollar.
               <br />
-              We believe that people with passion can change the world for the better.
+              Who do you want to be and how can the money you earn get you there?
             </p>
             <div className="landing-cta-row">
               <Link to="/onboarding" className="landing-cta-get-started">
-                Get started
+                Get started — it's free
               </Link>
             </div>
+            <p className="landing-cta-note">No credit card required</p>
           </section>
-          <div className="landing-hero-visual" aria-hidden>
-            <img src="/hero-phones.png" alt="" className="landing-hero-img" />
+          <div className="landing-hero-dashboard" aria-hidden>
+            <img src="/hero-dashboard.png" alt="" className="landing-hero-dashboard-img" loading="lazy" />
           </div>
         </div>
 
@@ -152,6 +241,52 @@ export default function Landing() {
                 />
               </div>
             ))}
+          </div>
+        </div>
+
+        <div className="landing-quote-overlay landing-quote-overlay-3" aria-hidden key={page4Key}>
+          <div className="landing-quote-overlay-2-text-wrap">
+            <p className="landing-quote-text landing-quote-text-3">
+              <span className="landing-quote-text-3-second-line">
+                Regardless of your{' '}
+                <span className="landing-quote-cycling" key={`${page4Key}-${cyclingIndex}`}>
+                  {CYCLING_WORDS[cyclingIndex]}
+                </span>
+              </span>
+            </p>
+          </div>
+        </div>
+
+        <div className="landing-quote-overlay landing-quote-overlay-4" aria-hidden>
+          <div className="landing-quote-overlay-2-text-wrap">
+            <p className="landing-quote-text landing-quote-text-4">Simple, Fast and Secure.</p>
+          </div>
+        </div>
+
+        <div className="landing-stats-page" aria-hidden>
+          <div className="landing-stats-bg" />
+          <div className="landing-stats-inner">
+            <div className="landing-stats-content">
+              <h2 className="landing-stats-title">
+                Designed to
+                <br />
+                compound advantage
+              </h2>
+              <div className="landing-stats-kpis">
+                <div className="landing-stats-kpi">
+                  <span className="landing-stats-number">{num1}%</span>
+                  <span className="landing-stats-label">Average revenue boost</span>
+                </div>
+                <div className="landing-stats-kpi">
+                  <span className="landing-stats-number">{num2}%</span>
+                  <span className="landing-stats-label">Average savings increase</span>
+                </div>
+                <div className="landing-stats-kpi">
+                  <span className="landing-stats-number">{num3}%</span>
+                  <span className="landing-stats-label">Customer Retention Rate</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </main>

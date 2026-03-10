@@ -52,23 +52,19 @@ export const MOCK_ACCOUNTS = [
   { id: 'checking-1', name: 'Main Checking', type: 'checking', balance: 4520.5, lastReconciledAt: '2025-02-20' },
   { id: 'savings-1', name: 'Emergency Fund', type: 'savings', balance: 12000, lastReconciledAt: '2025-02-01' },
   { id: 'credit-1', name: 'Credit Card', type: 'credit', balance: -340, lastReconciledAt: '2025-02-15' },
-  { id: 'mortgage-1', name: 'Mortgage', type: 'other', balance: -180600, lastReconciledAt: '2025-02-01' },
   { id: 'student-loans-1', name: 'Student Loans', type: 'other', balance: -36500, lastReconciledAt: '2025-02-01' },
   { id: 'tfsa-1', name: 'TFSA', type: 'tfsa', balance: 8500, lastReconciledAt: null },
-  { id: 'rrsp-1', name: 'RRSP', type: 'rrsp', balance: 22000, lastReconciledAt: null },
 ]
 
 /** Map debt account id -> debt category key for Goals debt chart */
 export const DEBT_ACCOUNT_TO_CATEGORY = {
   'credit-1': 'creditCard',
-  'mortgage-1': 'mortgage',
   'student-loans-1': 'studentLoans',
 }
 
 /** Starting debt balance (owed) at beginning of 2024-03 for computing debt-by-month from transactions */
 const DEBT_START_BALANCES_2024_03 = {
   'credit-1': 2400,
-  'mortgage-1': 185000,
   'student-loans-1': 42000,
 }
 
@@ -81,20 +77,20 @@ const STATIC_CREDIT_DEBT_BY_MONTH = {
 
 const DEBT_MONTHS = ['2024-03', '2024-04', '2024-05', '2024-06', '2024-07', '2024-08', '2024-09', '2024-10', '2024-11', '2024-12', '2025-01', '2025-02']
 
-/** Default debt-by-month for Pay off debt goal (credit card, mortgage, student loans) – smaller amounts, line chart */
+/** Default debt-by-month for Pay off debt goal (credit card, student loans) */
 export const DEFAULT_DEBT_BY_MONTH = {
-  '2024-03': { creditCard: 1200, mortgage: 12000, studentLoans: 6000 },
-  '2024-04': { creditCard: 1050, mortgage: 11900, studentLoans: 5850 },
-  '2024-05': { creditCard: 900, mortgage: 11800, studentLoans: 5700 },
-  '2024-06': { creditCard: 750, mortgage: 11700, studentLoans: 5550 },
-  '2024-07': { creditCard: 600, mortgage: 11600, studentLoans: 5400 },
-  '2024-08': { creditCard: 450, mortgage: 11500, studentLoans: 5250 },
-  '2024-09': { creditCard: 300, mortgage: 11400, studentLoans: 5100 },
-  '2024-10': { creditCard: 150, mortgage: 11300, studentLoans: 4950 },
-  '2024-11': { creditCard: 0, mortgage: 11200, studentLoans: 4800 },
-  '2024-12': { creditCard: 0, mortgage: 11100, studentLoans: 4650 },
-  '2025-01': { creditCard: 0, mortgage: 11000, studentLoans: 4500 },
-  '2025-02': { creditCard: 0, mortgage: 10900, studentLoans: 4350 },
+  '2024-03': { creditCard: 1200, studentLoans: 6000 },
+  '2024-04': { creditCard: 1050, studentLoans: 5850 },
+  '2024-05': { creditCard: 900, studentLoans: 5700 },
+  '2024-06': { creditCard: 750, studentLoans: 5550 },
+  '2024-07': { creditCard: 600, studentLoans: 5400 },
+  '2024-08': { creditCard: 450, studentLoans: 5250 },
+  '2024-09': { creditCard: 300, studentLoans: 5100 },
+  '2024-10': { creditCard: 150, studentLoans: 4950 },
+  '2024-11': { creditCard: 0, studentLoans: 4800 },
+  '2024-12': { creditCard: 0, studentLoans: 4650 },
+  '2025-01': { creditCard: 0, studentLoans: 4500 },
+  '2025-02': { creditCard: 0, studentLoans: 4350 },
 }
 
 /**
@@ -122,17 +118,12 @@ export function computeDebtByMonthFromTransactions(transactions) {
     const lastDay = new Date(y, m, 0).getDate()
     const end = `${ym}-${String(lastDay).padStart(2, '0')}`
     const creditCard = STATIC_CREDIT_DEBT_BY_MONTH[ym] ?? 0
-    let mortgage = DEBT_START_BALANCES_2024_03['mortgage-1'] ?? 0
     let studentLoans = DEBT_START_BALANCES_2024_03['student-loans-1'] ?? 0
-    ;['mortgage-1', 'student-loans-1'].forEach((accId) => {
-      const list = byAccount[accId]?.payments ?? []
-      const sum = list.filter((p) => p.date <= end).reduce((s, p) => s + p.amount, 0)
-      const start = DEBT_START_BALANCES_2024_03[accId] ?? 0
-      const balance = Math.max(0, start - sum)
-      if (accId === 'mortgage-1') mortgage = balance
-      else studentLoans = balance
-    })
-    debtByMonth[ym] = { creditCard, mortgage, studentLoans }
+    const list = byAccount['student-loans-1']?.payments ?? []
+    const sum = list.filter((p) => p.date <= end).reduce((s, p) => s + p.amount, 0)
+    const start = DEBT_START_BALANCES_2024_03['student-loans-1'] ?? 0
+    studentLoans = Math.max(0, start - sum)
+    debtByMonth[ym] = { creditCard, studentLoans }
   })
   return debtByMonth
 }
@@ -153,10 +144,6 @@ export const MOCK_TRANSACTIONS = [
   { id: 't11', date: '2025-02-18', payee: 'TFSA Contribution', amount: 500, categoryId: null, accountId: 'tfsa-1', cleared: true },
   { id: 't12', date: '2025-02-01', payee: 'ETF Dividend', amount: 42.50, categoryId: null, accountId: 'tfsa-1', cleared: true },
   { id: 't13', date: '2025-01-15', payee: 'TFSA Contribution', amount: 500, categoryId: null, accountId: 'tfsa-1', cleared: true },
-  // RRSP
-  { id: 't14', date: '2025-02-20', payee: 'RRSP Contribution', amount: 1000, categoryId: null, accountId: 'rrsp-1', cleared: true },
-  { id: 't15', date: '2025-02-01', payee: 'RRSP Dividend', amount: 78.25, categoryId: null, accountId: 'rrsp-1', cleared: true },
-  { id: 't16', date: '2025-01-05', payee: 'RRSP Contribution', amount: 800, categoryId: null, accountId: 'rrsp-1', cleared: true },
   // More history – spending varies month to month; Dec over budget (4500)
   { id: 't17', date: '2024-11-05', payee: 'Rent', amount: -1400, categoryId: 'rent', accountId: 'checking-1', cleared: true },
   { id: 't18', date: '2024-11-08', payee: 'Whole Foods', amount: -180, categoryId: 'groceries', accountId: 'checking-1', cleared: true },
@@ -189,18 +176,6 @@ export const MOCK_TRANSACTIONS = [
   { id: 't41', date: '2025-01-20', payee: 'Insurance', amount: -120, categoryId: 'insurance', accountId: 'checking-1', cleared: true },
   { id: 't42', date: '2025-01-22', payee: 'Amazon', amount: -89.99, categoryId: 'shopping', accountId: 'credit-1', cleared: true },
   { id: 't43', date: '2025-01-25', payee: 'Coffee Shop', amount: -18, categoryId: 'dining', accountId: 'checking-1', cleared: true },
-  // Debt payments – mortgage (400/mo; no payment Dec 2024 so balance 181400 -> 181400)
-  { id: 'td9', date: '2024-03-01', payee: 'Mortgage payment', amount: 400, categoryId: 'rent', accountId: 'mortgage-1', cleared: true },
-  { id: 'td10', date: '2024-04-01', payee: 'Mortgage payment', amount: 400, categoryId: 'rent', accountId: 'mortgage-1', cleared: true },
-  { id: 'td11', date: '2024-05-01', payee: 'Mortgage payment', amount: 400, categoryId: 'rent', accountId: 'mortgage-1', cleared: true },
-  { id: 'td12', date: '2024-06-01', payee: 'Mortgage payment', amount: 400, categoryId: 'rent', accountId: 'mortgage-1', cleared: true },
-  { id: 'td13', date: '2024-07-01', payee: 'Mortgage payment', amount: 400, categoryId: 'rent', accountId: 'mortgage-1', cleared: true },
-  { id: 'td14', date: '2024-08-01', payee: 'Mortgage payment', amount: 400, categoryId: 'rent', accountId: 'mortgage-1', cleared: true },
-  { id: 'td15', date: '2024-09-01', payee: 'Mortgage payment', amount: 400, categoryId: 'rent', accountId: 'mortgage-1', cleared: true },
-  { id: 'td16', date: '2024-10-01', payee: 'Mortgage payment', amount: 400, categoryId: 'rent', accountId: 'mortgage-1', cleared: true },
-  { id: 'td17', date: '2024-11-01', payee: 'Mortgage payment', amount: 400, categoryId: 'rent', accountId: 'mortgage-1', cleared: true },
-  { id: 'td18', date: '2025-01-01', payee: 'Mortgage payment', amount: 400, categoryId: 'rent', accountId: 'mortgage-1', cleared: true },
-  { id: 'td19', date: '2025-02-01', payee: 'Mortgage payment', amount: 400, categoryId: 'rent', accountId: 'mortgage-1', cleared: true },
   // Student loan payments (500/mo; no payment Dec 2024)
   { id: 'td20', date: '2024-03-05', payee: 'Student loan payment', amount: 500, categoryId: null, accountId: 'student-loans-1', cleared: true },
   { id: 'td21', date: '2024-04-05', payee: 'Student loan payment', amount: 500, categoryId: null, accountId: 'student-loans-1', cleared: true },

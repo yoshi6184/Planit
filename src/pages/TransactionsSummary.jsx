@@ -1,70 +1,202 @@
-import { useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { useMemo, useRef } from 'react'
 import { useApp } from '../context/AppContext'
-import { getAccountEmoji } from '../data/mockData'
 import { formatCurrency } from '../utils/format'
 
 export default function TransactionsSummary() {
   const { state } = useApp()
   const { accounts, transactions, categories } = state
+  const receiptInputRef = useRef(null)
 
   const getCategoryName = (id) => categories.find((c) => c.id === id)?.name || '—'
   const getAccountName = (id) => accounts.find((a) => a.id === id)?.name || '—'
 
+  const handleVoiceFilter = () => {
+    if (typeof window === 'undefined') return
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SpeechRecognition) {
+      // Graceful no-op if browser doesn't support speech recognition
+      return
+    }
+    const recognition = new SpeechRecognition()
+    recognition.lang = 'en-US'
+    recognition.interimResults = false
+    recognition.maxAlternatives = 1
+    recognition.start()
+  }
+
+  const handleReceiptToolbarClick = () => {
+    if (receiptInputRef.current) {
+      receiptInputRef.current.click()
+    }
+  }
+
+  const handleReceiptToolbarChange = (e) => {
+    const file = e.target.files && e.target.files[0]
+    if (!file) return
+    // No persistence yet – reset so the same file can be chosen again
+    e.target.value = ''
+  }
+
   const allTx = useMemo(
-    () => [...transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 30),
+    () => [...transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 50),
     [transactions]
   )
 
-  const totalBalance = useMemo(
-    () => accounts.reduce((sum, a) => sum + (a.balance || 0), 0),
-    [accounts]
-  )
+  const currentMonth = '2025-02'
+
+  const monthSummary = useMemo(() => {
+    let net = 0
+    let moneyIn = 0
+    let moneyOut = 0
+
+    transactions.forEach((t) => {
+      if (!t.date || !t.date.startsWith(currentMonth)) return
+      const amount = t.amount || 0
+      net += amount
+      if (amount > 0) {
+        moneyIn += amount
+      } else if (amount < 0) {
+        moneyOut += Math.abs(amount)
+      }
+    })
+
+    return { netChange: net, moneyIn, moneyOut }
+  }, [transactions])
+
+  const { netChange, moneyIn, moneyOut } = monthSummary
 
   return (
-    <div>
-      <h1 style={{ margin: '0 0 0.5rem', fontSize: '1.35rem', fontWeight: 600 }}>Transactions</h1>
-      <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
-        Overview of all accounts. Click an account in the sidebar to see details.
-      </p>
+    <div className="transactions-page">
+      <div className="transactions-header-row">
+        <h1 className="transactions-title">Transactions</h1>
+      </div>
 
-      <div className="card" style={{ marginBottom: '1.5rem' }}>
-        <h2 style={{ margin: '0 0 0.5rem', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-          Total balance
-        </h2>
-        <div style={{ fontSize: '1.75rem', fontWeight: 700 }} className={totalBalance >= 0 ? 'amount-positive' : 'amount-negative'}>
-          {formatCurrency(totalBalance)}
+      <div className="transactions-summary-strip">
+        <div className="transactions-summary-item transactions-summary-item-primary">
+          <div className="transactions-summary-label">Net change this month</div>
+          <div
+            className={`transactions-summary-value ${
+              netChange >= 0 ? 'transactions-summary-value-positive' : 'transactions-summary-value-negative'
+            }`}
+          >
+            {formatCurrency(netChange)}
+          </div>
+        </div>
+        <div className="transactions-summary-item">
+          <div className="transactions-summary-label">Money in</div>
+          <div className="transactions-summary-value transactions-summary-value-positive">
+            {formatCurrency(moneyIn)}
+          </div>
+        </div>
+        <div className="transactions-summary-item">
+          <div className="transactions-summary-label">Money out</div>
+          <div className="transactions-summary-value transactions-summary-value-negative">
+            {formatCurrency(moneyOut > 0 ? -moneyOut : 0)}
+          </div>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-        {accounts.map((acc) => (
-          <Link
-            key={acc.id}
-            to={`/transactions/accounts/${acc.id}`}
-            className="card"
-            style={{
-              textDecoration: 'none',
-              color: 'inherit',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              padding: '1rem',
-            }}
+      <div className="transactions-toolbar">
+        <div className="transactions-toolbar-left">
+          <button type="button" className="transactions-pill">
+            <span className="transactions-pill-icon" aria-hidden>
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="8" height="7" rx="1.5" />
+                <rect x="13" y="4" width="8" height="4" rx="1.5" />
+                <rect x="13" y="10" width="8" height="7" rx="1.5" />
+                <rect x="3" y="13" width="8" height="4" rx="1.5" />
+              </svg>
+            </span>
+            Data views
+          </button>
+          <button type="button" className="transactions-pill">
+            <span className="transactions-pill-icon" aria-hidden>
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 5h16l-5 6v5l-6 3v-8z" />
+              </svg>
+            </span>
+            Filters
+          </button>
+          <button type="button" className="transactions-pill">Date</button>
+          <button type="button" className="transactions-pill">Keyword</button>
+          <button type="button" className="transactions-pill">Amount</button>
+        </div>
+        <div className="transactions-toolbar-right">
+          <button type="button" className="transactions-icon-button transactions-match-button">
+            <span className="transactions-pill-icon" aria-hidden>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="4" y="4" width="16" height="13" rx="2" />
+                <path d="M8 9h8" />
+                <path d="M8 13h4" />
+              </svg>
+            </span>
+            Match receipts
+          </button>
+          <button
+            type="button"
+            className="transactions-icon-button"
+            aria-label="Voice input for filters"
+            onClick={handleVoiceFilter}
           >
-            <span style={{ fontSize: '1.75rem' }}>{getAccountEmoji(acc.type)}</span>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{acc.name}</div>
-              <div style={{ fontSize: '0.9rem' }} className={acc.balance >= 0 ? 'amount-positive' : 'amount-negative'}>
-                {formatCurrency(acc.balance || 0)}
-              </div>
-            </div>
-          </Link>
-        ))}
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z" />
+              <path d="M19 10a7 7 0 0 1-14 0" />
+              <path d="M12 17v4" />
+              <path d="M8 21h8" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            className="transactions-icon-button"
+            onClick={handleReceiptToolbarClick}
+          >
+            <span className="transactions-pill-icon" aria-hidden>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7" />
+                <path d="M16 3v4h4" />
+                <path d="M16 17l2 2 4-4" />
+              </svg>
+            </span>
+            Upload receipt
+          </button>
+          <input
+            ref={receiptInputRef}
+            type="file"
+            accept="image/*,application/pdf"
+            onChange={handleReceiptToolbarChange}
+            style={{ display: 'none' }}
+          />
+          <button type="button" className="transactions-icon-button" aria-label="Toggle view">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="4" y="5" width="6" height="4" rx="1" />
+              <rect x="4" y="13" width="6" height="4" rx="1" />
+              <rect x="14" y="5" width="6" height="4" rx="1" />
+              <rect x="14" y="13" width="6" height="4" rx="1" />
+            </svg>
+          </button>
+          <button type="button" className="transactions-icon-button" aria-label="Sort">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M8 17V5" />
+              <path d="M5 14l3 3 3-3" />
+              <path d="M16 7v12" />
+              <path d="M13 10l3-3 3 3" />
+            </svg>
+          </button>
+          <button type="button" className="transactions-icon-button" aria-label="More filters">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="5" cy="12" r="1.5" />
+              <circle cx="12" cy="12" r="1.5" />
+              <circle cx="19" cy="12" r="1.5" />
+            </svg>
+          </button>
+          <button type="button" className="transactions-icon-button">Export all</button>
+        </div>
       </div>
 
-      <div className="card">
-        <h2 style={{ margin: '0 0 1rem', fontSize: '1rem', fontWeight: 600 }}>Recent transactions (all accounts)</h2>
+      <div className="card transactions-table-card">
+        <div className="transactions-table-header">
+          <span className="transactions-table-title">All transactions</span>
+        </div>
         <div className="table-wrap">
           <table>
             <thead>

@@ -29,6 +29,14 @@ const defaultGoals = [
   { id: 'goal-3', name: 'Down payment for house', type: 'target', targetAmount: 50000, currentAmount: 12500 },
 ]
 
+function getDefaultPlanCategoryOrder() {
+  return {
+    need: (PRESET_CATEGORIES.need || []).map((c) => c.id),
+    want: (PRESET_CATEGORIES.want || []).map((c) => c.id),
+    bills: (PRESET_CATEGORIES.bills || []).map((c) => c.id),
+  }
+}
+
 const initialState = {
   hasCompletedOnboarding: false,
   monthlyIncome: 4500,
@@ -38,6 +46,9 @@ const initialState = {
   transactions: MOCK_TRANSACTIONS,
   quote: getRandomQuote(),
   goals: defaultGoals,
+  planCategoryOrder: getDefaultPlanCategoryOrder(),
+  categoryTypeOverrides: {},
+  snoozedCategoryIds: [],
 }
 
 function appReducer(state, action) {
@@ -119,6 +130,51 @@ function appReducer(state, action) {
       return {
         ...state,
         goals: state.goals.filter((g) => g.id !== action.payload),
+      }
+    case 'REORDER_PLAN_CATEGORY': {
+      const { typeId, fromIndex, toIndex } = action.payload
+      const order = state.planCategoryOrder?.[typeId] ? [...state.planCategoryOrder[typeId]] : getDefaultPlanCategoryOrder()[typeId] || []
+      const [removed] = order.splice(fromIndex, 1)
+      order.splice(toIndex, 0, removed)
+      return {
+        ...state,
+        planCategoryOrder: {
+          ...state.planCategoryOrder,
+          [typeId]: order,
+        },
+      }
+    }
+    case 'MOVE_PLAN_CATEGORY': {
+      const { categoryId, fromTypeId, toTypeId, toIndex } = action.payload
+      const order = { ...state.planCategoryOrder }
+      const fromList = [...(order[fromTypeId] || [])]
+      const toList = fromTypeId === toTypeId ? fromList : [...(order[toTypeId] || [])]
+      const fromIdx = fromList.indexOf(categoryId)
+      if (fromIdx === -1) return state
+      fromList.splice(fromIdx, 1)
+      if (fromTypeId === toTypeId) {
+        toList.splice(toIndex > fromIdx ? toIndex - 1 : toIndex, 0, categoryId)
+        order[fromTypeId] = toList
+      } else {
+        toList.splice(toIndex, 0, categoryId)
+        order[fromTypeId] = fromList
+        order[toTypeId] = toList
+      }
+      return {
+        ...state,
+        planCategoryOrder: order,
+        categoryTypeOverrides: {
+          ...state.categoryTypeOverrides,
+          [categoryId]: toTypeId,
+        },
+      }
+    }
+    case 'TOGGLE_SNOOZED_CATEGORY':
+      return {
+        ...state,
+        snoozedCategoryIds: state.snoozedCategoryIds.includes(action.payload)
+          ? state.snoozedCategoryIds.filter((id) => id !== action.payload)
+          : [...state.snoozedCategoryIds, action.payload],
       }
     default:
       return state

@@ -1,8 +1,6 @@
 import { useState, useMemo } from 'react'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { useApp } from '../context/AppContext'
 import { formatCurrency } from '../utils/format'
-import { DEFAULT_DEBT_BY_MONTH } from '../data/mockData'
 
 const GOAL_TYPES = [
   { id: 'target', label: 'Target amount (e.g. emergency fund, down payment)' },
@@ -34,18 +32,6 @@ export default function Goals() {
   })
 
   const months = useMemo(() => getLast12Months(), [])
-
-  const debtChartData = useMemo(() => {
-    const entries = Object.entries(DEFAULT_DEBT_BY_MONTH || {}).sort(([a], [b]) => (a < b ? -1 : 1))
-    return entries.map(([month, v]) => ({
-      month,
-      'Credit card': v.creditCard ?? 0,
-      'Mortgage': v.mortgage ?? 0,
-      'Student loans': v.studentLoans ?? 0,
-    }))
-  }, [])
-
-  const formatWholeCurrency = (n) => '$' + Math.round(n || 0).toLocaleString('en-US')
 
   const emergencyFundGoal = useMemo(() => goals.find((g) => g.name === 'Emergency fund'), [goals])
   const otherGoals = useMemo(() => goals.filter((g) => g.name !== 'Emergency fund'), [goals])
@@ -338,52 +324,6 @@ export default function Goals() {
                 </p>
               </div>
             )}
-          </div>
-        </div>
-      )}
-
-      {debtChartData.length > 0 && (
-        <div className="goals-debt-card card">
-          <h2 className="goals-card-title">Debt over time</h2>
-          <p className="goals-debt-subtitle">Stacked bars by month. Hover for amounts.</p>
-          <div className="goals-debt-chart-wrap">
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={debtChartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} barCategoryGap="25%">
-                <XAxis
-                  dataKey="month"
-                  tick={{ fontSize: 11 }}
-                  tickFormatter={(val) => {
-                    const d = new Date(val + '-01')
-                    return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
-                  }}
-                />
-                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => formatWholeCurrency(v)} />
-                <Tooltip
-                  formatter={(v) => [formatWholeCurrency(v)]}
-                  labelFormatter={(label) => {
-                    const d = new Date(label + '-01')
-                    return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-                  }}
-                />
-                <Bar dataKey="Credit card" stackId="debt" fill="var(--debt-credit)" name="Credit card" />
-                <Bar dataKey="Mortgage" stackId="debt" fill="var(--debt-mortgage)" name="Mortgage" />
-                <Bar dataKey="Student loans" stackId="debt" fill="var(--debt-student)" name="Student loans" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="goals-debt-legend">
-            <span className="goals-debt-legend-item">
-              <span className="goals-debt-legend-swatch" style={{ background: 'var(--debt-credit)' }} />
-              Credit card
-            </span>
-            <span className="goals-debt-legend-item">
-              <span className="goals-debt-legend-swatch" style={{ background: 'var(--debt-mortgage)' }} />
-              Mortgage
-            </span>
-            <span className="goals-debt-legend-item">
-              <span className="goals-debt-legend-swatch" style={{ background: 'var(--debt-student)' }} />
-              Student loans
-            </span>
           </div>
         </div>
       )}

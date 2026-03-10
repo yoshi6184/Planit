@@ -139,7 +139,7 @@ export default function Onboarding() {
   const { dispatch } = useApp()
   const navigate = useNavigate()
 
-  const [step, setStep] = useState(0)
+  const [step, setStep] = useState(1)
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
