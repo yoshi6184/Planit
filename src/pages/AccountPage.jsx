@@ -1,34 +1,152 @@
-import { useMemo, useState, useRef } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { formatCurrency } from '../utils/format'
+import AccountDisplayName from '../components/AccountDisplayName'
 import { ACCOUNT_TYPES } from '../context/AppContext'
 import { AccountIcon } from '../components/AccountIcons'
+import { getCategoryEmoji } from '../data/mockData'
+import FileImportModal from '../components/FileImportModal'
+import PageHeaderRow from '../components/PageHeaderRow'
+
+const CATEGORY_GROUP_LABELS = { need: 'Needs', want: 'Wants', bills: 'Bills' }
 
 export default function AccountPage() {
   const { accountId } = useParams()
   const navigate = useNavigate()
   const { state, dispatch } = useApp()
-  const { accounts, transactions, categories } = state
+  const { accounts, transactions, categories, categoryBudgets, monthlyIncome } = state
+  const currentMonth = '2025-02'
 
-  const [showAdd, setShowAdd] = useState(false)
+  const [selectedIds, setSelectedIds] = useState(() => new Set())
+  const [editingId, setEditingId] = useState(null)
+  const [categoryOpenId, setCategoryOpenId] = useState(null)
+  const [editingDraft, setEditingDraft] = useState(null)
   const [showImport, setShowImport] = useState(false)
-  const [newTx, setNewTx] = useState({
-    date: new Date().toISOString().slice(0, 10),
-    payee: '',
-    amount: '',
-    categoryId: '',
-    cleared: true,
-    receiptName: '',
-  })
-  const [importText, setImportText] = useState('')
-  const receiptInputRef = useRef(null)
 
   const account = accounts.find((a) => a.id === accountId)
   const accountTx = useMemo(
-    () => transactions.filter((t) => t.accountId === accountId).sort((a, b) => b.date.localeCompare(a.date)),
+    () => [...transactions].filter((t) => t.accountId === accountId).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 50),
     [transactions, accountId]
   )
+
+  useEffect(() => {
+    if (!editingId) {
+      setEditingDraft(null)
+      return
+    }
+    if (editingId === 'new') {
+      setEditingDraft({
+        id: 'new',
+        accountId: accountId,
+        date: new Date().toISOString().slice(0, 10),
+        payee: '',
+        categoryId: '',
+        memo: '',
+        amount: 0,
+        cleared: true,
+      })
+      return
+    }
+    const t = transactions.find((tr) => tr.id === editingId)
+    if (t) {
+      setEditingDraft({
+        id: t.id,
+        accountId: t.accountId,
+        date: t.date,
+        payee: t.payee || '',
+        categoryId: t.categoryId || '',
+        memo: t.memo || '',
+        amount: t.amount || 0,
+        cleared: t.cleared !== false,
+      })
+    }
+  }, [editingId, transactions, accountId])
+
+  const getCategory = (id) => categories.find((c) => c.id === id)
+  const getCategoryDisplay = (t) => {
+    if (!t.categoryId) return null
+    const c = getCategory(t.categoryId)
+    if (!c) return null
+    const group = CATEGORY_GROUP_LABELS[c.type] || ''
+    return group ? `${group}: ${getCategoryEmoji(c.id)} ${c.name}` : `${getCategoryEmoji(c.id)} ${c.name}`
+  }
+
+  const toggleSelection = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+    setEditingId(null)
+  }
+  const clearSelection = () => {
+    setSelectedIds(new Set())
+    setEditingId(null)
+  }
+
+  useEffect(() => {
+    if (!categoryOpenId) return
+    const onPointer = (e) => {
+      if (e.target.closest('.transactions-all-category-wrap')) return
+      setCategoryOpenId(null)
+    }
+    document.addEventListener('mousedown', onPointer)
+    return () => document.removeEventListener('mousedown', onPointer)
+  }, [categoryOpenId])
+
+  const handleApproveEdit = () => {
+    if (!editingDraft) return
+    if (editingDraft.id === 'new') {
+      dispatch({
+        type: 'ADD_TRANSACTION',
+        payload: {
+          accountId: editingDraft.accountId,
+          date: editingDraft.date,
+          payee: editingDraft.payee,
+          categoryId: editingDraft.categoryId || null,
+          memo: editingDraft.memo || null,
+          amount: editingDraft.amount,
+          cleared: editingDraft.cleared,
+        },
+      })
+    } else {
+      dispatch({
+        type: 'UPDATE_TRANSACTION',
+        payload: {
+          id: editingDraft.id,
+          accountId: editingDraft.accountId,
+          date: editingDraft.date,
+          payee: editingDraft.payee,
+          categoryId: editingDraft.categoryId || null,
+          memo: editingDraft.memo || null,
+          amount: editingDraft.amount,
+          cleared: editingDraft.cleared,
+        },
+      })
+    }
+    setEditingId(null)
+    setEditingDraft(null)
+    setSelectedIds(new Set())
+  }
+
+  const handleCancelEdit = () => {
+    setEditingId(null)
+    setEditingDraft(null)
+    setSelectedIds(new Set())
+  }
+
+  const handleRowClick = (tId) => {
+    const isOnlySelected = selectedIds.size === 1 && selectedIds.has(tId)
+    const isCurrentlyEditing = editingId === tId
+    if (isOnlySelected && !isCurrentlyEditing) {
+      setEditingId(tId)
+    } else {
+      setSelectedIds(new Set([tId]))
+      setEditingId(null)
+    }
+  }
 
   const CURRENT_MONTH = '2025-02'
   const PREVIOUS_MONTH = '2025-01'
@@ -75,6 +193,38 @@ export default function AccountPage() {
   const getCategoryName = (id) => categories.find((c) => c.id === id)?.name || '—'
   const getAccountTypeLabel = (typeId) => ACCOUNT_TYPES.find((t) => t.id === typeId)?.label || typeId
 
+  // Categories that participate in the budget (for inline category editing)
+  const budgetCategories = useMemo(
+    () => categories.filter((c) => Object.prototype.hasOwnProperty.call(categoryBudgets || {}, c.id)),
+    [categories, categoryBudgets]
+  )
+
+  const { categoryDropdownSections, remainingIncome } = useMemo(() => {
+    const activityByCat = {}
+    transactions
+      .filter((t) => t.date && t.date.startsWith(currentMonth) && t.amount < 0 && t.categoryId)
+      .forEach((t) => {
+        activityByCat[t.categoryId] = (activityByCat[t.categoryId] || 0) + t.amount
+      })
+    const available = {}
+    budgetCategories.forEach((c) => {
+      const budget = categoryBudgets[c.id] || 0
+      const activity = activityByCat[c.id] || 0
+      available[c.id] = budget + activity
+    })
+    const totalBudgeted = Object.values(categoryBudgets || {}).reduce((a, b) => a + b, 0)
+    const remaining = (monthlyIncome || 0) - totalBudgeted
+    const sections = [
+      { label: 'Inflow', options: [{ id: '', name: 'Ready to Assign', available: remaining }] },
+      { label: 'Credit Card Payments', options: [{ id: '_cc', name: 'Credit Card', available: 0 }] },
+      ...['need', 'want', 'bills'].map((type) => ({
+        label: CATEGORY_GROUP_LABELS[type],
+        options: budgetCategories.filter((c) => c.type === type).map((c) => ({ ...c, available: available[c.id] ?? 0 })),
+      })),
+    ]
+    return { categoryDropdownSections: sections, remainingIncome: remaining }
+  }, [transactions, currentMonth, budgetCategories, categoryBudgets, monthlyIncome])
+
   const handleVoicePayee = () => {
     if (typeof window === 'undefined') return
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
@@ -91,56 +241,6 @@ export default function AccountPage() {
       setNewTx((prev) => ({ ...prev, payee: transcript }))
     }
     recognition.start()
-  }
-
-  const handleReceiptChange = (e) => {
-    const file = e.target.files && e.target.files[0]
-    if (!file) return
-    setNewTx((prev) => ({ ...prev, receiptName: file.name }))
-  }
-
-  const handleAddTransaction = (e) => {
-    e.preventDefault()
-    const amount = parseFloat(newTx.amount)
-    if (!newTx.payee || isNaN(amount)) return
-    dispatch({
-      type: 'ADD_TRANSACTION',
-      payload: {
-        date: newTx.date,
-        payee: newTx.payee,
-        amount,
-        categoryId: newTx.categoryId || null,
-        accountId,
-        cleared: newTx.cleared,
-        receiptName: newTx.receiptName || null,
-      },
-    })
-    setNewTx({
-      date: new Date().toISOString().slice(0, 10),
-      payee: '',
-      amount: '',
-      categoryId: '',
-      cleared: true,
-      receiptName: '',
-    })
-    setShowAdd(false)
-  }
-
-  const handleImport = () => {
-    const lines = importText.trim().split('\n').filter(Boolean)
-    const imported = lines.map((line, i) => {
-      const parts = line.split(',').map((p) => p.trim())
-      const date = parts[0] || new Date().toISOString().slice(0, 10)
-      const payee = parts[1] || 'Imported'
-      const amount = parseFloat(parts[2]) || 0
-      const categoryId = parts[3] ? categories.find((c) => c.id === parts[3] || c.name === parts[3])?.id : null
-      const cleared = parts[4] !== 'false' && parts[4] !== '0'
-      return { id: 'imp' + Date.now() + i, date, payee, amount, categoryId, accountId, cleared }
-    })
-
-    dispatch({ type: 'IMPORT_TRANSACTIONS', payload: imported })
-    setImportText('')
-    setShowImport(false)
   }
 
   const handleReconcile = () => {
@@ -160,10 +260,14 @@ export default function AccountPage() {
 
   return (
     <div className="transactions-page">
-      <h1 className="transactions-title" style={{ margin: '0 0 0.5rem' }}>
-        <span className="account-page-icon" style={{ marginRight: '0.35rem' }}><AccountIcon type={account.type} /></span>
-        {account.name}
-      </h1>
+      <PageHeaderRow
+        left={
+          <h1 className="transactions-title" style={{ margin: 0 }}>
+            <span className="account-page-icon" style={{ marginRight: '0.35rem' }}><AccountIcon type={account.type} /></span>
+            <AccountDisplayName account={account} />
+          </h1>
+        }
+      />
 
       {/* Account hero stats */}
       <div className="account-summary-strip transactions-summary-strip">
@@ -207,7 +311,7 @@ export default function AccountPage() {
       </div>
 
       <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-        <button type="button" className="transactions-pill" onClick={() => setShowAdd(true)}>+ Add transaction</button>
+        <button type="button" className="transactions-pill transactions-pill-add" onClick={() => setEditingId('new')}>+ Add transaction</button>
         <button type="button" className="transactions-pill" onClick={() => setShowImport(true)}>Import from file</button>
         <button
           type="button"
@@ -224,180 +328,381 @@ export default function AccountPage() {
           </span>
           Voice input
         </button>
-        <button
-          type="button"
-          className="transactions-pill"
-          onClick={() => receiptInputRef.current && receiptInputRef.current.click()}
-        >
-          <span className="transactions-pill-icon" aria-hidden>
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7" />
-              <path d="M16 3v4h4" />
-              <path d="M16 17l2 2 4-4" />
-            </svg>
-          </span>
-          Upload receipt
-        </button>
-        <input
-          ref={receiptInputRef}
-          type="file"
-          accept="image/*,application/pdf"
-          onChange={handleReceiptChange}
-          style={{ display: 'none' }}
-        />
-        {newTx.receiptName && (
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            Attached: {newTx.receiptName}
-          </span>
-        )}
       </div>
 
-      {showAdd && (
-        <div className="card" style={{ marginBottom: '1rem' }}>
-          <h3 style={{ margin: '0 0 1rem', fontSize: '1rem' }}>Add transaction</h3>
-          <form onSubmit={handleAddTransaction} style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'flex-end' }}>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Date</span>
-              <input
-                type="date"
-                value={newTx.date}
-                onChange={(e) => setNewTx((p) => ({ ...p, date: e.target.value }))}
-                style={{ padding: '0.5rem', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}
-              />
-            </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', minWidth: '200px' }}>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Payee</span>
-              <input
-                value={newTx.payee}
-                onChange={(e) => setNewTx((p) => ({ ...p, payee: e.target.value }))}
-                placeholder="Payee"
-                style={{ padding: '0.5rem', border: '1px solid var(--border)', borderRadius: 'var(--radius)', minWidth: '160px' }}
-              />
-            </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Inflow</span>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={newTx.amount >= 0 ? newTx.amount : ''}
-                onChange={(e) => setNewTx((p) => ({ ...p, amount: e.target.value ? parseFloat(e.target.value) : '' }))}
-                placeholder="0.00"
-                style={{ padding: '0.5rem', border: '1px solid var(--border)', borderRadius: 'var(--radius)', width: '100px' }}
-              />
-            </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Outflow</span>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={newTx.amount < 0 ? Math.abs(newTx.amount) : ''}
-                onChange={(e) => setNewTx((p) => ({ ...p, amount: e.target.value ? -parseFloat(e.target.value) : '' }))}
-                placeholder="0.00"
-                style={{ padding: '0.5rem', border: '1px solid var(--border)', borderRadius: 'var(--radius)', width: '100px' }}
-              />
-            </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Category</span>
-              <select
-                value={newTx.categoryId}
-                onChange={(e) => setNewTx((p) => ({ ...p, categoryId: e.target.value }))}
-                style={{ padding: '0.5rem', border: '1px solid var(--border)', borderRadius: 'var(--radius)', minWidth: '140px' }}
-              >
-                <option value="">—</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </label>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', paddingBottom: '0.25rem' }}>
-              All new transactions are treated as cleared.
-            </span>
-            <button type="submit" className="btn btn-primary">Save</button>
-            <button type="button" className="btn btn-secondary" onClick={() => setShowAdd(false)}>Cancel</button>
-          </form>
-        </div>
-      )}
-
-      {showImport && (
-        <div className="card" style={{ marginBottom: '1rem' }}>
-          <h3 style={{ margin: '0 0 0.5rem' }}>Import from file</h3>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.75rem' }}>
-            One line per transaction: date, payee, amount, categoryId (optional), cleared (optional). Example: 2025-02-20, Store, -25.99, groceries, true
-          </p>
-          <textarea
-            value={importText}
-            onChange={(e) => setImportText(e.target.value)}
-            placeholder="2025-02-20, Store, -25.99, groceries"
-            rows={4}
-            style={{ width: '100%', padding: '0.75rem', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontFamily: 'inherit', marginBottom: '0.75rem' }}
-          />
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button type="button" className="btn btn-primary" onClick={handleImport}>Import</button>
-            <button type="button" className="btn btn-secondary" onClick={() => { setShowImport(false); setImportText('') }}>Cancel</button>
-          </div>
-        </div>
-      )}
-
-      <div className="card">
-        <h2 style={{ margin: '0 0 1rem', fontSize: '1rem', fontWeight: 600 }}>Transactions</h2>
+      <div className="card transactions-table-card">
         <div className="table-wrap">
-          <table>
+          <table className="transactions-all-table transactions-all-table-account">
             <thead>
               <tr>
+                <th className="transactions-all-th-check" aria-label="Select">
+                  <span className="transactions-all-header-checkbox" aria-hidden>✓</span>
+                </th>
+                <th className="transactions-all-th-new" aria-label="New"><span className="transactions-all-header-box transactions-all-header-i">i</span></th>
                 <th>Date</th>
                 <th>Payee</th>
                 <th>Category</th>
                 <th style={{ textAlign: 'right' }}>Inflow</th>
                 <th style={{ textAlign: 'right' }}>Outflow</th>
-                <th>Receipt</th>
+                <th className="transactions-all-th-cleared" aria-label="Cleared"><span className="transactions-all-cleared-header" aria-hidden>✓</span></th>
               </tr>
             </thead>
             <tbody>
-              {accountTx.map((t) => (
-                <tr key={t.id}>
-                  <td>{t.date}</td>
-                  <td>{t.payee}</td>
-                  <td>{getCategoryName(t.categoryId)}</td>
-                  <td style={{ textAlign: 'right' }} className="amount-positive">
-                    {t.amount > 0 ? formatCurrency(t.amount) : '—'}
-                  </td>
-                  <td style={{ textAlign: 'right' }} className="amount-negative">
-                    {t.amount < 0 ? formatCurrency(Math.abs(t.amount)) : '—'}
-                  </td>
-                  <td>
-                    {t.receiptName ? (
-                      <span
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.3rem',
-                          padding: '0.15rem 0.45rem',
-                          borderRadius: '999px',
-                          background: 'rgba(148, 163, 184, 0.12)',
-                          fontSize: '0.75rem',
-                          color: 'var(--text-muted)',
-                          maxWidth: '180px',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
+              {editingId === 'new' && editingDraft && editingDraft.id === 'new' && (() => {
+                const draft = editingDraft
+                const inflowVal = (draft.amount || 0) > 0 ? String(draft.amount) : ''
+                const outflowVal = (draft.amount || 0) < 0 ? String(Math.abs(draft.amount)) : ''
+                const isCleared = draft.cleared
+                return (
+                  <tr key="new" className="transactions-all-row-editing" onClick={(e) => e.stopPropagation()}>
+                    <td className="transactions-all-td-check">
+                      <button type="button" className="transactions-all-checkbox selected" onClick={() => setEditingId(null)} aria-label="Close edit">
+                        <span className="transactions-all-checkmark" aria-hidden>✓</span>
+                      </button>
+                    </td>
+                    <td className="transactions-all-td-new">
+                      {!draft.categoryId && <span className="transactions-all-new-icon new" title="New transaction" aria-hidden>i</span>}
+                    </td>
+                    <td>
+                      <input
+                        type="date"
+                        className="transactions-all-edit-input"
+                        value={draft.date}
+                        onChange={(e) => setEditingDraft((p) => ({ ...p, date: e.target.value }))}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="text"
+                        className="transactions-all-edit-input"
+                        value={draft.payee}
+                        onChange={(e) => setEditingDraft((p) => ({ ...p, payee: e.target.value }))}
+                        onClick={(e) => e.stopPropagation()}
+                        placeholder="Payee"
+                      />
+                    </td>
+                    <td className="transactions-all-td-category">
+                      <select
+                        className="transactions-all-edit-input transactions-all-edit-select transactions-all-edit-category"
+                        value={draft.categoryId || ''}
+                        onChange={(e) => {
+                          const v = e.target.value
+                          if (v === '_inflow' || v === '_cc') {
+                            setEditingDraft((p) => ({ ...p, categoryId: '' }))
+                            return
+                          }
+                          setEditingDraft((p) => ({ ...p, categoryId: v || '' }))
                         }}
-                        title={t.receiptName}
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        <span aria-hidden>📎</span>
-                        <span>{t.receiptName}</span>
-                      </span>
-                    ) : (
-                      <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>No receipt</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                        <option value="">Uncategorized</option>
+                        <option value="_inflow">Ready to Assign — {formatCurrency(remainingIncome)}</option>
+                        {categoryDropdownSections.filter((s) => s.label !== 'Inflow' && s.label !== 'Credit Card Payments').map((sec) => (
+                          <optgroup key={sec.label} label={sec.label}>
+                            {sec.options.map((c) => (
+                              <option key={c.id} value={c.id}>{getCategoryEmoji(c.id)} {c.name} — {formatCurrency(c.available)}</option>
+                            ))}
+                          </optgroup>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="transactions-all-td-inflow">
+                      <input
+                        type="text"
+                        className="transactions-all-edit-input transactions-all-edit-amount"
+                        value={inflowVal}
+                        onChange={(e) => { const v = parseFloat(e.target.value) || 0; setEditingDraft((p) => ({ ...p, amount: v })) }}
+                        onClick={(e) => e.stopPropagation()}
+                        placeholder=""
+                      />
+                    </td>
+                    <td className="transactions-all-td-outflow">
+                      <div className="transactions-all-outflow-wrap">
+                        <input
+                          type="text"
+                          className="transactions-all-edit-input transactions-all-edit-amount"
+                          value={outflowVal}
+                          onChange={(e) => { const v = parseFloat(e.target.value) || 0; setEditingDraft((p) => ({ ...p, amount: -v })) }}
+                          onClick={(e) => e.stopPropagation()}
+                          placeholder=""
+                        />
+                        <div className="transactions-all-inline-actions">
+                          <button type="button" className="transactions-all-inline-cancel" onClick={handleCancelEdit}>Cancel</button>
+                          <button type="button" className="transactions-all-inline-approve" onClick={handleApproveEdit}>Approve</button>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="transactions-all-td-cleared">
+                      <div className="transactions-all-cleared-cell-inner">
+                        <button
+                          type="button"
+                          className={`transactions-all-cleared-toggle ${isCleared ? 'cleared' : ''}`}
+                          onClick={() => setEditingDraft((p) => ({ ...p, cleared: !p.cleared }))}
+                          aria-label={isCleared ? 'Mark uncleared' : 'Mark cleared'}
+                          title={isCleared ? 'Cleared' : 'Uncleared'}
+                        >
+                          <span className="transactions-all-cleared-check" aria-hidden>✓</span>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })()}
+              {accountTx.map((t) => {
+                const isSelected = selectedIds.has(t.id)
+                const isEditRow = t.id === editingId && editingDraft && editingDraft.id === t.id
+                const categoryLabel = getCategoryDisplay(t)
+                const isCategoryOpen = categoryOpenId === t.id
+                const isCleared = isEditRow ? editingDraft.cleared : t.cleared !== false
+                const draft = isEditRow ? editingDraft : null
+
+                if (isEditRow && draft) {
+                  const inflowVal = (draft.amount || 0) > 0 ? String(draft.amount) : ''
+                  const outflowVal = (draft.amount || 0) < 0 ? String(Math.abs(draft.amount)) : ''
+                  return (
+                    <tr key={t.id} className="transactions-all-row-editing" onClick={(e) => e.stopPropagation()}>
+                      <td className="transactions-all-td-check">
+                        <button
+                          type="button"
+                          className="transactions-all-checkbox selected"
+                          onClick={() => setEditingId(null)}
+                          aria-label="Close edit"
+                        >
+                          <span className="transactions-all-checkmark" aria-hidden>✓</span>
+                        </button>
+                      </td>
+                      <td className="transactions-all-td-new">
+                        {!draft.categoryId && <span className="transactions-all-new-icon new" title="New transaction" aria-hidden>i</span>}
+                      </td>
+                      <td>
+                        <input
+                          type="date"
+                          className="transactions-all-edit-input"
+                          value={draft.date}
+                          onChange={(e) => setEditingDraft((p) => ({ ...p, date: e.target.value }))}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="text"
+                          className="transactions-all-edit-input"
+                          value={draft.payee}
+                          onChange={(e) => setEditingDraft((p) => ({ ...p, payee: e.target.value }))}
+                          onClick={(e) => e.stopPropagation()}
+                          placeholder="Payee"
+                        />
+                      </td>
+                      <td className="transactions-all-td-category">
+                        <select
+                          className="transactions-all-edit-input transactions-all-edit-select transactions-all-edit-category"
+                          value={draft.categoryId || ''}
+                          onChange={(e) => {
+                            const v = e.target.value
+                            if (v === '_inflow' || v === '_cc') {
+                              setEditingDraft((p) => ({ ...p, categoryId: '' }))
+                              return
+                            }
+                            setEditingDraft((p) => ({ ...p, categoryId: v || '' }))
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <option value="">Uncategorized</option>
+                          <option value="_inflow">Ready to Assign — {formatCurrency(remainingIncome)}</option>
+                          {categoryDropdownSections.filter((s) => s.label !== 'Inflow' && s.label !== 'Credit Card Payments').map((sec) => (
+                            <optgroup key={sec.label} label={sec.label}>
+                              {sec.options.map((c) => (
+                                <option key={c.id} value={c.id}>{getCategoryEmoji(c.id)} {c.name} — {formatCurrency(c.available)}</option>
+                              ))}
+                            </optgroup>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="transactions-all-td-inflow">
+                        <input
+                          type="text"
+                          className="transactions-all-edit-input transactions-all-edit-amount"
+                          value={inflowVal}
+                          onChange={(e) => {
+                            const v = parseFloat(e.target.value) || 0
+                            setEditingDraft((p) => ({ ...p, amount: v }))
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          placeholder=""
+                        />
+                      </td>
+                      <td className="transactions-all-td-outflow">
+                        <div className="transactions-all-outflow-wrap">
+                          <input
+                            type="text"
+                            className="transactions-all-edit-input transactions-all-edit-amount"
+                            value={outflowVal}
+                            onChange={(e) => {
+                              const v = parseFloat(e.target.value) || 0
+                              setEditingDraft((p) => ({ ...p, amount: -v }))
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            placeholder=""
+                          />
+                          <div className="transactions-all-inline-actions">
+                            <button type="button" className="transactions-all-inline-cancel" onClick={handleCancelEdit}>
+                              Cancel
+                            </button>
+                            <button type="button" className="transactions-all-inline-approve" onClick={handleApproveEdit}>
+                              Approve
+                            </button>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="transactions-all-td-cleared">
+                        <div className="transactions-all-cleared-cell-inner">
+                          <button
+                            type="button"
+                            className={`transactions-all-cleared-toggle ${isCleared ? 'cleared' : ''}`}
+                            onClick={() => setEditingDraft((p) => ({ ...p, cleared: !p.cleared }))}
+                            aria-label={isCleared ? 'Mark uncleared' : 'Mark cleared'}
+                            title={isCleared ? 'Cleared' : 'Uncleared'}
+                          >
+                            <span className="transactions-all-cleared-check" aria-hidden>✓</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                }
+
+                return (
+                  <tr
+                    key={t.id}
+                    className={isSelected ? 'transactions-all-row-selected' : ''}
+                    onClick={() => handleRowClick(t.id)}
+                  >
+                    <td className="transactions-all-td-check" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        className={`transactions-all-checkbox ${isSelected ? 'selected' : ''}`}
+                        onClick={() => toggleSelection(t.id)}
+                        aria-label={isSelected ? 'Deselect' : 'Select'}
+                      >
+                        {isSelected && <span className="transactions-all-checkmark" aria-hidden>✓</span>}
+                      </button>
+                    </td>
+                    <td className="transactions-all-td-new">
+                      {!t.categoryId && <span className="transactions-all-new-icon new" title="New transaction" aria-hidden>i</span>}
+                    </td>
+                    <td>{t.date}</td>
+                    <td>{t.payee}</td>
+                    <td className="transactions-all-td-category">
+                      <div className="transactions-all-category-wrap">
+                        {categoryLabel ? (
+                          <button
+                            type="button"
+                            className="transactions-all-category-pill"
+                            onClick={(e) => { e.stopPropagation(); setCategoryOpenId(isCategoryOpen ? null : t.id) }}
+                          >
+                            {categoryLabel}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="transactions-all-category-pill uncategorized"
+                            onClick={(e) => { e.stopPropagation(); setCategoryOpenId(isCategoryOpen ? null : t.id) }}
+                          >
+                            This needs a category
+                          </button>
+                        )}
+                        {isCategoryOpen && (
+                          <div className="transactions-all-category-dropdown" role="listbox">
+                            <button
+                              type="button"
+                              className="transactions-all-category-option"
+                              onClick={(e) => { e.stopPropagation(); dispatch({ type: 'UPDATE_TRANSACTION', payload: { id: t.id, categoryId: null } }); setCategoryOpenId(null) }}
+                            >
+                              <span>Uncategorized</span>
+                            </button>
+                            {categoryDropdownSections.map((sec) => (
+                              <div key={sec.label} className="transactions-all-category-dropdown-section">
+                                <div className="transactions-all-category-dropdown-section-header">{sec.label}</div>
+                                {sec.options.map((opt) => (
+                                  <button
+                                    key={opt.id || sec.label + '-' + opt.name}
+                                    type="button"
+                                    className="transactions-all-category-option"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      if (opt.id === '_cc' || opt.id === '') {
+                                        dispatch({ type: 'UPDATE_TRANSACTION', payload: { id: t.id, categoryId: null } })
+                                      } else {
+                                        dispatch({ type: 'UPDATE_TRANSACTION', payload: { id: t.id, categoryId: opt.id } })
+                                      }
+                                      setCategoryOpenId(null)
+                                    }}
+                                  >
+                                    <span>{opt.id ? (opt.emoji ? `${opt.emoji} ${opt.name}` : opt.name) : opt.name}</span>
+                                    <span className="transactions-all-category-option-amount amount-positive">{formatCurrency(opt.available)}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td style={{ textAlign: 'right' }} className="amount-positive">
+                      {t.amount > 0 ? formatCurrency(t.amount) : '—'}
+                    </td>
+                    <td style={{ textAlign: 'right' }} className="amount-negative">
+                      {t.amount < 0 ? formatCurrency(Math.abs(t.amount)) : '—'}
+                    </td>
+                    <td className="transactions-all-td-cleared" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        className={`transactions-all-cleared-toggle ${isCleared ? 'cleared' : ''}`}
+                        onClick={() => dispatch({ type: 'UPDATE_TRANSACTION', payload: { id: t.id, cleared: !isCleared } })}
+                        aria-label={isCleared ? 'Mark uncleared' : 'Mark cleared'}
+                        title={isCleared ? 'Cleared' : 'Uncleared'}
+                      >
+                        <span className="transactions-all-cleared-check" aria-hidden>✓</span>
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
       </div>
+      {selectedIds.size > 0 && (
+        <div className="transactions-all-action-bar-wrap">
+          <div className="transactions-all-action-bar" role="toolbar">
+            <button type="button" className="transactions-all-action-dismiss" onClick={clearSelection} aria-label="Clear selection">
+              × {selectedIds.size} Transaction{selectedIds.size !== 1 ? 's' : ''}
+            </button>
+            <span className="transactions-all-action-divider" aria-hidden />
+            <button type="button" className="transactions-all-action-btn">
+              <span className="transactions-all-action-icon" aria-hidden>✔</span> Approve
+            </button>
+            <span className="transactions-all-action-divider" aria-hidden />
+            <button type="button" className="transactions-all-action-btn">
+              <span className="transactions-all-action-icon" aria-hidden>✖</span> Reject
+            </button>
+            <span className="transactions-all-action-divider" aria-hidden />
+            <button type="button" className="transactions-all-action-btn">
+              <span className="transactions-all-action-icon" aria-hidden>☑</span> Categorize
+            </button>
+            <span className="transactions-all-action-divider" aria-hidden />
+            <button type="button" className="transactions-all-action-btn">
+              <span className="transactions-all-action-icon" aria-hidden>⋯</span> More
+            </button>
+          </div>
+        </div>
+      )}
+      <FileImportModal
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        onChooseFile={() => setShowImport(false)}
+      />
     </div>
   )
 }

@@ -1,27 +1,17 @@
-import { useState, useMemo, useEffect } from 'react'
-import { XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, ComposedChart, Line, Area } from 'recharts'
+import { useState, useMemo } from 'react'
+import { XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, ComposedChart, Line, Area, PieChart, Pie, Cell } from 'recharts'
 import { useApp } from '../context/AppContext'
-import { MOCK_SUBSCRIPTIONS, DEFAULT_DEBT_BY_MONTH } from '../data/mockData'
+import { MOCK_SUBSCRIPTIONS, DEFAULT_DEBT_BY_MONTH, getCategoryEmoji } from '../data/mockData'
 import { formatCurrency } from '../utils/format'
+import AccountDisplayName from '../components/AccountDisplayName'
+import PageHeaderRow from '../components/PageHeaderRow'
 
 // Neutral-first palette: biggest spend categories use greys, then accents
-const STACK_COLORS = [
-  '#111827',
-  '#4b5563',
-  '#6b7280',
-  '#9ca3af',
-  '#d1d5db',
-  '#0d9488',
-  '#059669',
-  '#0284c7',
-  '#2563eb',
-  '#4f46e5',
-  '#6d28d9',
-  '#7c3aed',
-  '#9d174d',
-  '#b45309',
-  '#dc2626',
-]
+// Match dashboard spending pie palette
+const PIE_COLORS_OTHER = ['#64748b', '#0d9488', '#059669', '#0284c7', '#94a3b8', '#475569', '#0f766e', '#0369a1', '#1e40af', '#6b7280']
+const getPieColor = (index) => (index === 0 ? '#5B6ADF' : PIE_COLORS_OTHER[(index - 1) % PIE_COLORS_OTHER.length])
+const INCOME_BAR = '#5B6ADF'
+const EXPENSE_BAR = '#94a3b8'
 
 const MONTHS = ['2024-11', '2024-12', '2025-01', '2025-02']
 
@@ -43,7 +33,6 @@ export default function Reports() {
   const { state } = useApp()
   const { transactions, categories, categoryBudgets, accounts } = state
   const [activeTab, setActiveTab] = useState('spending')
-  const [categoryVisibility, setCategoryVisibility] = useState(() => ({}))
 
   const monthlyTrend = useMemo(() => {
     const byMonth = {}
@@ -80,15 +69,67 @@ export default function Reports() {
       byCat[id] = (byCat[id] || 0) + Math.abs(t.amount)
     })
     return categories
-      .map((c) => ({ name: c.name, spent: byCat[c.id] || 0, budget: categoryBudgets[c.id] || 0 }))
+      .map((c) => ({ id: c.id, name: c.name, spent: byCat[c.id] || 0, budget: categoryBudgets[c.id] || 0 }))
       .filter((r) => r.spent > 0 || r.budget > 0)
       .sort((a, b) => b.spent - a.spent)
   }, [transactions, categories, categoryBudgets])
+
+  const currentMonthKey = MONTHS[MONTHS.length - 1]
+  const reportSpendByCategoryThisMonth = useMemo(() => {
+    const byCat = {}
+    transactions
+      .filter((t) => t.date.startsWith(currentMonthKey) && t.amount < 0 && t.categoryId)
+      .forEach((t) => {
+        byCat[t.categoryId] = (byCat[t.categoryId] || 0) + Math.abs(t.amount)
+      })
+    return categories
+      .map((c) => ({ id: c.id, name: c.name, spent: byCat[c.id] || 0 }))
+      .filter((r) => r.spent > 0)
+      .sort((a, b) => b.spent - a.spent)
+  }, [transactions, categories, currentMonthKey])
+  const reportTotalSpentThisMonth = useMemo(
+    () => reportSpendByCategoryThisMonth.reduce((s, r) => s + r.spent, 0),
+    [reportSpendByCategoryThisMonth]
+  )
 
   const totalSpent = useMemo(
     () => transactions.filter((t) => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0),
     [transactions]
   )
+
+  // Average daily spend is computed month-over-month below for the active month.
+
+  const mostFrequentCategory = useMemo(() => {
+    const counts = {}
+    transactions.filter((t) => t.amount < 0).forEach((t) => {
+      const id = t.categoryId || 'uncategorized'
+      counts[id] = (counts[id] || 0) + 1
+    })
+    let bestId = null
+    let bestCount = 0
+    Object.entries(counts).forEach(([id, count]) => {
+      if (count > bestCount) {
+        bestCount = count
+        bestId = id
+      }
+    })
+    if (!bestId) return { name: '—', count: 0 }
+    if (bestId === 'uncategorized') return { name: 'Uncategorized', count: bestCount }
+    const cat = categories.find((c) => c.id === bestId)
+    return { name: cat ? cat.name : 'Other', count: bestCount }
+  }, [transactions, categories])
+
+  const largestOutflow = useMemo(() => {
+    const spendingTx = transactions.filter((t) => t.amount < 0)
+    if (spendingTx.length === 0) return { name: '—', amount: 0 }
+    let minTx = spendingTx[0]
+    spendingTx.forEach((t) => {
+      if (t.amount < minTx.amount) minTx = t
+    })
+    const cat = categories.find((c) => c.id === minTx.categoryId)
+    const name = cat ? cat.name : 'Uncategorized'
+    return { name, amount: Math.abs(minTx.amount || 0) }
+  }, [transactions, categories])
 
   const netWorth = useMemo(
     () => accounts.reduce((sum, a) => sum + (a.balance || 0), 0),
@@ -117,6 +158,8 @@ export default function Reports() {
     }))
   }, [transactions, netWorth])
 
+  const previousMonthKey = MONTHS[MONTHS.length - 2]
+
   const totalMonthlySubscriptions = useMemo(
     () => MOCK_SUBSCRIPTIONS.reduce((sum, s) => sum + s.pricePerMonth, 0),
     []
@@ -139,28 +182,57 @@ export default function Reports() {
 
   const formatWholeCurrency = (n) => '$' + Math.round(n || 0).toLocaleString('en-US')
 
-  const averageMonthlySpend = useMemo(() => {
-    if (monthlyTrend.length === 0) return 0
-    return monthlyTrend.reduce((s, r) => s + r.spent, 0) / monthlyTrend.length
-  }, [monthlyTrend])
-
-  const { stackedChartData, stackCategoryNames } = useMemo(() => {
-    const byMonthByCat = {}
-    transactions.filter((t) => t.amount < 0).forEach((t) => {
+  // Month-over-month spend and daily averages
+  const monthlySpendMap = useMemo(() => {
+    const byMonth = {}
+    transactions.forEach((t) => {
+      if (t.amount >= 0 || !t.date) return
       const month = t.date.slice(0, 7)
-      const cat = categories.find((c) => c.id === t.categoryId)
-      const name = cat ? cat.name : 'Uncategorized'
-      if (!byMonthByCat[month]) byMonthByCat[month] = {}
-      byMonthByCat[month][name] = (byMonthByCat[month][name] || 0) + Math.abs(t.amount)
+      byMonth[month] = (byMonth[month] || 0) + Math.abs(t.amount)
     })
-    const names = [...new Set(MONTHS.flatMap((m) => Object.keys(byMonthByCat[m] || {})))].sort()
-    const data = MONTHS.map((m) => {
-      const row = { month: m }
-      names.forEach((name) => { row[name] = byMonthByCat[m]?.[name] || 0 })
-      return row
+    return byMonth
+  }, [transactions])
+
+  const dailySpendByMonth = useMemo(() => {
+    const totals = {}
+    const days = {}
+    transactions.forEach((t) => {
+      if (t.amount >= 0 || !t.date) return
+      const month = t.date.slice(0, 7)
+      totals[month] = (totals[month] || 0) + Math.abs(t.amount)
+      if (!days[month]) days[month] = new Set()
+      days[month].add(t.date)
     })
-    return { stackedChartData: data, stackCategoryNames: names }
-  }, [transactions, categories])
+    const out = {}
+    Object.keys(totals).forEach((m) => {
+      const dayCount = days[m] ? days[m].size : 1
+      out[m] = {
+        total: totals[m],
+        averageDaily: totals[m] / dayCount,
+      }
+    })
+    return out
+  }, [transactions])
+
+  const monthSpendCurrent = monthlySpendMap[currentMonthKey] || 0
+  const monthSpendPrev = monthlySpendMap[previousMonthKey] || 0
+
+  const averageDailyCurrent = dailySpendByMonth[currentMonthKey]?.averageDaily || 0
+  const averageDailyPrev = dailySpendByMonth[previousMonthKey]?.averageDaily || 0
+
+  const pctChange = (curr, prev) => {
+    if (!prev) return null
+    return ((curr - prev) / Math.abs(prev)) * 100
+  }
+
+  const avgMonthlyPct = pctChange(monthSpendCurrent, monthSpendPrev)
+  const avgDailyPct = pctChange(averageDailyCurrent, averageDailyPrev)
+
+  const averageMonthlySpend = monthSpendCurrent
+
+  // Removed: Spending by category (stacked by month)
+
+  const averageDailySpend = useMemo(() => averageDailyCurrent, [averageDailyCurrent])
 
   const spendingCompareTable = useMemo(() => {
     return monthlyTrend.map((r) => {
@@ -180,24 +252,11 @@ export default function Reports() {
     [categorySpend]
   )
 
-  const orderedStackNames = useMemo(() => {
-    const top = stackCategoryNames.filter((name) => topFiveCategoryNames.includes(name))
-    const rest = stackCategoryNames.filter((name) => !topFiveCategoryNames.includes(name))
-    return [...top, ...rest]
-  }, [stackCategoryNames, topFiveCategoryNames])
-
-  useEffect(() => {
-    if (!stackCategoryNames.length) return
-    if (Object.keys(categoryVisibility).length > 0) return
-    const initial = Object.fromEntries(
-      stackCategoryNames.map((name) => [name, topFiveCategoryNames.includes(name)])
-    )
-    setCategoryVisibility(initial)
-  }, [stackCategoryNames, topFiveCategoryNames, categoryVisibility])
+  // Removed: Stacked chart visibility controls
 
   return (
-    <div>
-      <h1 style={{ margin: '0 0 1rem', fontSize: '1.5rem' }}>Reports & trends</h1>
+    <div className="reports-page">
+      <PageHeaderRow left={<h1 className="transactions-title" style={{ margin: 0 }}>Reports & trends</h1>} />
 
       <nav className="reports-tabs" role="tablist">
         {REPORT_TABS.map((tab) => (
@@ -216,65 +275,125 @@ export default function Reports() {
 
       {activeTab === 'spending' && (
         <>
-          <div className="card" style={{ marginBottom: '1.5rem' }}>
-            <h2 style={{ margin: '0 0 0.5rem', fontSize: '1.1rem' }}>Average monthly spend</h2>
-            <p style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }} className="amount-spent">
-              {formatCurrency(averageMonthlySpend)}
-            </p>
+          <div className="transactions-summary-strip" style={{ marginBottom: '1.5rem' }}>
+            <div className="transactions-summary-item">
+              <div className="transactions-summary-label">Average monthly spending</div>
+              <div className="transactions-summary-value transactions-summary-value-negative">
+                {formatCurrency(averageMonthlySpend)}
+              </div>
+              <div className="transactions-summary-pct" style={{ color: avgMonthlyPct != null ? (avgMonthlyPct >= 0 ? 'var(--red)' : 'var(--green)') : 'var(--text-muted)' }}>
+                {avgMonthlyPct != null ? `${avgMonthlyPct >= 0 ? '+' : ''}${avgMonthlyPct.toFixed(1)}%` : '—'} vs last month
+              </div>
+            </div>
+            <div className="transactions-summary-item">
+              <div className="transactions-summary-label">Average daily spending</div>
+              <div className="transactions-summary-value transactions-summary-value-negative">
+                {formatCurrency(averageDailySpend)}
+              </div>
+              <div className="transactions-summary-pct" style={{ color: avgDailyPct != null ? (avgDailyPct >= 0 ? 'var(--red)' : 'var(--green)') : 'var(--text-muted)' }}>
+                {avgDailyPct != null ? `${avgDailyPct >= 0 ? '+' : ''}${avgDailyPct.toFixed(1)}%` : '—'} vs last month
+              </div>
+            </div>
+            <div className="transactions-summary-item">
+              <div className="transactions-summary-label">Most frequent category</div>
+              <div className="transactions-summary-value" style={{ fontWeight: 600 }}>
+                {mostFrequentCategory.name}
+              </div>
+              <div className="transactions-summary-pct" style={{ color: 'var(--text-muted)' }}>
+                {mostFrequentCategory.count || 0} transaction{mostFrequentCategory.count === 1 ? '' : 's'}
+              </div>
+            </div>
+            <div className="transactions-summary-item">
+              <div className="transactions-summary-label">Largest outflow</div>
+              <div className="transactions-summary-value" style={{ fontWeight: 600 }}>
+                {largestOutflow.name}
+              </div>
+              <div className="transactions-summary-pct" style={{ color: 'var(--text-muted)' }}>
+                {formatCurrency(largestOutflow.amount)}
+              </div>
+            </div>
           </div>
-          <div className="card" style={{ marginBottom: '1.5rem' }}>
-            <h2 style={{ margin: '0 0 1rem', fontSize: '1.1rem' }}>Spending by category (stacked by month)</h2>
-            <p style={{ margin: '0 0 0.75rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-              Click a category in the legend to show or hide it.
-            </p>
-            <div style={{ height: 320 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={stackedChartData}
-                  margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
-                  barCategoryGap="70%"
-                >
-                  <XAxis
-                    dataKey="month"
-                    tick={{ fontSize: 11 }}
-                    tickFormatter={(val) => {
-                      const d = new Date(val + '-01')
-                      return d.toLocaleDateString('en-US', { month: 'short' })
-                    }}
-                  />
-                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => formatCurrency(v)} />
-                  <Tooltip formatter={(v) => [formatCurrency(v)]} labelFormatter={(l) => l} />
-                  {orderedStackNames.map((name, i) => {
-                    const visible = categoryVisibility[name] !== false
+          <div className="reports-spending-split" style={{ marginBottom: '1.5rem' }}>
+            <div className="reports-spending-pie-half">
+              <div className="card reports-spending-pie-card">
+                <h2 className="reports-spending-pie-title">Spending by category</h2>
+                {reportSpendByCategoryThisMonth.length > 0 ? (
+                  <div className="dashboard-pie-wrap">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={reportSpendByCategoryThisMonth.map((r) => ({ name: r.name, value: r.spent }))}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={135}
+                          outerRadius={190}
+                          paddingAngle={1}
+                          dataKey="value"
+                          nameKey="name"
+                          strokeWidth={0}
+                          label={({ cx, cy, midAngle, outerRadius, name, percent }) => {
+                            const RADIAN = Math.PI / 180
+                            const r = outerRadius + 12
+                            const x = cx + r * Math.cos(-midAngle * RADIAN)
+                            const y = cy + r * Math.sin(-midAngle * RADIAN)
+                            return (
+                              <text x={x} y={y} textAnchor={x >= cx ? 'start' : 'end'} dominantBaseline="central" className="dashboard-pie-label" fill="currentColor">
+                                {name} {(percent * 100).toFixed(0)}%
+                              </text>
+                            )
+                          }}
+                        >
+                          {reportSpendByCategoryThisMonth.map((_, i) => (
+                            <Cell key={i} fill={getPieColor(i)} stroke="none" />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(v) => [formatCurrency(v)]} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="dashboard-pie-center reports-pie-center-total">
+                      <span className="dashboard-pie-center-label">TOTAL</span>
+                      <span className="dashboard-pie-center-value">{formatCurrency(reportTotalSpentThisMonth)}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>No spending this month.</p>
+                )}
+              </div>
+            </div>
+            <div className="reports-spending-list-half">
+              <div className="card reports-spending-list-card">
+                <div className="reports-spending-list-header">
+                  <span>Categories</span>
+                  <span>Total Spending</span>
+                </div>
+                <ul className="reports-spending-list">
+                  {reportSpendByCategoryThisMonth.map((row, i) => {
+                    const pct = reportTotalSpentThisMonth ? (row.spent / reportTotalSpentThisMonth) * 100 : 0
+                    const barColor = getPieColor(i)
                     return (
-                      <Bar
-                        key={name}
-                        dataKey={name}
-                        stackId="spend"
-                        fill={STACK_COLORS[i % STACK_COLORS.length]}
-                        name={name}
-                        hide={!visible}
-                      />
+                      <li key={row.id || row.name} className="reports-spending-list-row">
+                        <div className="reports-spending-list-line1">
+                          <span className="reports-spending-list-icon" aria-hidden>{getCategoryEmoji(row.id)}</span>
+                          <span className="reports-spending-list-name">{row.name}</span>
+                          <span className="reports-spending-list-amount">{formatCurrency(row.spent)}</span>
+                        </div>
+                        <div className="reports-spending-list-line2">
+                          <div className="reports-spending-list-bar-container">
+                            <div
+                              className="reports-spending-list-bar"
+                              style={{ width: `${pct}%`, background: barColor }}
+                            />
+                            <span className="reports-spending-list-pct">{Math.round(pct)}%</span>
+                          </div>
+                        </div>
+                      </li>
                     )
                   })}
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="reports-category-legend">
-              {orderedStackNames.map((name, i) => {
-                const visible = categoryVisibility[name] !== false
-                return (
-                  <button
-                    key={name}
-                    type="button"
-                    className={`reports-legend-item ${visible ? '' : 'inactive'}`}
-                    onClick={() => setCategoryVisibility((prev) => ({ ...prev, [name]: !visible }))}
-                  >
-                    <span className="reports-legend-swatch" style={{ background: STACK_COLORS[i % STACK_COLORS.length] }} />
-                    {name}
-                  </button>
-                )
-              })}
+                </ul>
+                {reportSpendByCategoryThisMonth.length === 0 && (
+                  <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', margin: 0 }}>No spending this month.</p>
+                )}
+              </div>
             </div>
           </div>
           <div className="card">
@@ -369,7 +488,7 @@ export default function Reports() {
                 <tbody>
                   {accounts.map((acc) => (
                     <tr key={acc.id}>
-                      <td>{acc.name}</td>
+                      <td><AccountDisplayName account={acc} /></td>
                       <td style={{ textAlign: 'right' }} className={acc.balance >= 0 ? 'amount-positive' : 'amount-negative'}>
                         {formatCurrency(acc.balance || 0)}
                       </td>
@@ -385,6 +504,40 @@ export default function Reports() {
       {activeTab === 'income-expense' && (
         <div className="card">
           <h2 style={{ margin: '0 0 1rem', fontSize: '1.1rem' }}>Income vs expense by month</h2>
+          <div style={{ height: 320, marginBottom: '1.25rem' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={incomeVsExpenseByMonth} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} barCategoryGap="35%">
+                <XAxis
+                  dataKey="month"
+                  tick={{ fontSize: 11 }}
+                  tickFormatter={(val) => {
+                    const d = new Date(val + '-01')
+                    return d.toLocaleDateString('en-US', { month: 'short' })
+                  }}
+                />
+                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => '$' + Math.round(v).toLocaleString('en-US')} />
+                <Tooltip
+                  formatter={(v) => [formatCurrency(v)]}
+                  labelFormatter={(label) => {
+                    const d = new Date(label + '-01')
+                    return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+                  }}
+                />
+                <Bar dataKey="income" name="Income" fill={INCOME_BAR} radius={[8, 8, 0, 0]} />
+                <Bar dataKey="expense" name="Expense" fill={EXPENSE_BAR} radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="goals-debt-legend" style={{ marginTop: 0, marginBottom: '1rem', paddingTop: 0, borderTop: 'none' }}>
+            <span className="goals-debt-legend-item" style={{ color: 'var(--text-muted)' }}>
+              <span className="goals-debt-legend-swatch" style={{ background: INCOME_BAR, opacity: 0.9 }} />
+              Income
+            </span>
+            <span className="goals-debt-legend-item" style={{ color: 'var(--text-muted)' }}>
+              <span className="goals-debt-legend-swatch" style={{ background: EXPENSE_BAR, opacity: 0.9 }} />
+              Expense
+            </span>
+          </div>
           <div className="table-wrap">
             <table className="reports-income-expense-table">
               <thead>

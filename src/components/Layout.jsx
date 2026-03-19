@@ -3,10 +3,26 @@ import { NavLink, useLocation } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import Logo from './Logo'
 import { AccountIcon } from './AccountIcons'
-import { IconHome, IconTransactions, IconReports, IconPlan, IconTasks } from './SidebarIcons'
+import { IconHome, IconTransactions, IconReports, IconPlan } from './SidebarIcons'
 
 export default function Layout({ children }) {
   const { state } = useApp()
+  const { theme } = state
+
+  useEffect(() => {
+    const apply = () => {
+      const resolved = theme === 'system'
+        ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+        : theme
+      document.documentElement.setAttribute('data-theme', resolved)
+    }
+    apply()
+    if (theme === 'system') {
+      const m = window.matchMedia('(prefers-color-scheme: dark)')
+      m.addEventListener('change', apply)
+      return () => m.removeEventListener('change', apply)
+    }
+  }, [theme])
   const { accounts } = state
   const location = useLocation()
   const isTransactions = location.pathname.startsWith('/transactions')
@@ -32,6 +48,9 @@ export default function Layout({ children }) {
         <nav className="sidebar-main-nav">
           <NavLink to="/dashboard" end className={({ isActive }) => `sidebar-link-with-icon${isActive ? ' active' : ''}`}>
             <span className="sidebar-menu-icon"><IconHome /></span> Home
+          </NavLink>
+          <NavLink to="/plan" className={({ isActive }) => `sidebar-link-with-icon${isActive ? ' active' : ''}`}>
+            <span className="sidebar-menu-icon"><IconPlan /></span> Plan
           </NavLink>
           <div className="sidebar-section">
             <NavLink
@@ -59,12 +78,6 @@ export default function Layout({ children }) {
           </div>
           <NavLink to="/reports" className={({ isActive }) => `sidebar-link-with-icon${isActive ? ' active' : ''}`}>
             <span className="sidebar-menu-icon"><IconReports /></span> Reports
-          </NavLink>
-          <NavLink to="/plan" className={({ isActive }) => `sidebar-link-with-icon${isActive ? ' active' : ''}`}>
-            <span className="sidebar-menu-icon"><IconPlan /></span> Plan
-          </NavLink>
-          <NavLink to="/tasks" className={({ isActive }) => `sidebar-link-with-icon${isActive ? ' active' : ''}`}>
-            <span className="sidebar-menu-icon"><IconTasks /></span> Tasks
           </NavLink>
         </nav>
       </aside>

@@ -1,19 +1,27 @@
+import planitLogo from '../assets/planit-logo-temp.png.jpg'
+
 export default function Logo({ className = '' }) {
   return (
-    <span
-      className={`logo-text ${className}`}
-      style={{
-        fontFamily: 'Georgia, "Times New Roman", serif',
-        fontWeight: 700,
-        letterSpacing: '-0.02em',
-        background: 'linear-gradient(135deg, #5a5a5a 0%, #2d2d2d 50%, #1a1a1a 100%)',
-        WebkitBackgroundClip: 'text',
-        WebkitTextFillColor: 'transparent',
-        backgroundClip: 'text',
-        filter: 'drop-shadow(0.5px 0.5px 0.4px rgba(26,26,26,0.25))',
-      }}
-    >
-      ProjectParity
-    </span>
+    <div className={className} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+      {/* Temporary: use provided bitmap logo */}
+      <img
+        src={planitLogo}
+        alt="Planit logo"
+        style={{ width: 26, height: 26, display: 'block' }}
+      />
+      <span
+        className="logo-text"
+        style={{
+          fontFamily: '"Plus Jakarta Sans", "DM Sans", system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif',
+          fontWeight: 600,
+          letterSpacing: '-0.02em',
+          fontSize: '1.1rem',
+          color: '#5b6bff',
+          textTransform: 'lowercase',
+        }}
+      >
+        planit
+      </span>
+    </div>
   )
 }

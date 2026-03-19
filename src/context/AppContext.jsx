@@ -48,7 +48,12 @@ const initialState = {
   goals: defaultGoals,
   planCategoryOrder: getDefaultPlanCategoryOrder(),
   categoryTypeOverrides: {},
+  customPlanCategories: [],
   snoozedCategoryIds: [],
+  categoryTargets: {}, // categoryId -> target settings
+  creditPaymentBudgets: {}, // accountId -> amount (budget to pay that credit card)
+  hideBalances: false,
+  theme: 'system', // 'light' | 'dark' | 'system'
 }
 
 function appReducer(state, action) {
@@ -65,12 +70,55 @@ function appReducer(state, action) {
           [action.payload.categoryId]: action.payload.amount,
         },
       }
-    case 'SET_CATEGORIES':
-      return { ...state, categories: action.payload }
-    case 'ADD_ACCOUNT':
+    case 'SET_CREDIT_PAYMENT_BUDGET':
       return {
         ...state,
-        accounts: [...state.accounts, { ...action.payload, id: 'acc-' + Date.now(), balance: 0, lastReconciledAt: null }],
+        creditPaymentBudgets: {
+          ...state.creditPaymentBudgets,
+          [action.payload.accountId]: action.payload.amount,
+        },
+      }
+    case 'SET_CATEGORIES':
+      return { ...state, categories: action.payload }
+    case 'SET_CATEGORY_TARGET': {
+      const { categoryId, target } = action.payload || {}
+      if (!categoryId) return state
+      return {
+        ...state,
+        categoryTargets: {
+          ...state.categoryTargets,
+          [categoryId]: target,
+        },
+      }
+    }
+    case 'REMOVE_CATEGORY_TARGET': {
+      const id = action.payload
+      if (!id) return state
+      const next = { ...(state.categoryTargets || {}) }
+      delete next[id]
+      return { ...state, categoryTargets: next }
+    }
+    case 'ADD_ACCOUNT': {
+      const p = action.payload || {}
+      const id = p.id || 'acc-' + Date.now()
+      const balance = p.balance != null ? Number(p.balance) : 0
+      const lastReconciledAt = p.lastReconciledAt != null ? p.lastReconciledAt : null
+      return {
+        ...state,
+        accounts: [...state.accounts, { ...p, id, balance, lastReconciledAt }],
+      }
+    }
+    case 'UPDATE_ACCOUNT':
+      return {
+        ...state,
+        accounts: state.accounts.map((a) =>
+          a.id === action.payload.id ? { ...a, ...action.payload } : a
+        ),
+      }
+    case 'REMOVE_ACCOUNT':
+      return {
+        ...state,
+        accounts: state.accounts.filter((a) => a.id !== action.payload),
       }
     case 'ADD_TRANSACTION': {
       const tx = { ...action.payload, id: 't' + Date.now(), cleared: action.payload.cleared !== false }
@@ -169,6 +217,19 @@ function appReducer(state, action) {
         },
       }
     }
+    case 'ADD_PLAN_CATEGORY': {
+      const { typeId, name } = action.payload
+      const id = 'custom-' + Date.now()
+      const newCat = { id, name: name.trim() || 'New Category', type: typeId, emoji: '📁' }
+      const order = { ...state.planCategoryOrder }
+      order[typeId] = [...(order[typeId] || []), id]
+      return {
+        ...state,
+        customPlanCategories: [...(state.customPlanCategories || []), newCat],
+        planCategoryOrder: order,
+        categoryBudgets: { ...state.categoryBudgets, [id]: 0 },
+      }
+    }
     case 'TOGGLE_SNOOZED_CATEGORY':
       return {
         ...state,
@@ -176,6 +237,10 @@ function appReducer(state, action) {
           ? state.snoozedCategoryIds.filter((id) => id !== action.payload)
           : [...state.snoozedCategoryIds, action.payload],
       }
+    case 'SET_HIDE_BALANCES':
+      return { ...state, hideBalances: action.payload }
+    case 'SET_THEME':
+      return { ...state, theme: action.payload }
     default:
       return state
   }

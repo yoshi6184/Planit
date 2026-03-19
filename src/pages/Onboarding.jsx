@@ -1,22 +1,36 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
+import AddManualAccount from '../components/AddManualAccount'
+import AccountSummary from '../components/AccountSummary'
 
 const TOTAL_STEPS = 7
 
 const BRINGS_OPTIONS = [
-  'Simplify my finance',
-  'Feel more in control',
-  'Get out of debt',
-  'Manage money with my partner',
-  'Make the most of my money',
-  'Save for something',
-  'Other',
+  { label: 'Simplify my finance', icon: '✨' },
+  { label: 'Feel more in control', icon: '🎛️' },
+  { label: 'Get out of debt', icon: '📉' },
+  { label: 'Manage money with my partner', icon: '👫' },
+  { label: 'Make the most of my money', icon: '💰' },
+  { label: 'Save for something', icon: '🎯' },
+  { label: 'Other', icon: '📁' },
 ]
 
-const HEAR_OPTIONS = ['Search', 'Friend or family', 'Social media', 'Blog or article', 'Other']
+const HEAR_OPTIONS = [
+  { label: 'Search', icon: '🔍' },
+  { label: 'Friend or family', icon: '👥' },
+  { label: 'Social media', icon: '📱' },
+  { label: 'Blog or article', icon: '📄' },
+  { label: 'Other', icon: '📁' },
+]
 
-const PLAN_INCLUDE_OPTIONS = ['Dining out', 'Hobbies', 'Holidays and gifts', 'Charity', 'Savings']
+const PLAN_INCLUDE_OPTIONS = [
+  { label: 'Dining out', icon: '🍽️' },
+  { label: 'Hobbies', icon: '🎨' },
+  { label: 'Holidays and gifts', icon: '🎁' },
+  { label: 'Charity', icon: '💝' },
+  { label: 'Savings', icon: '🏦' },
+]
 
 const POPULAR_BANKS = [
   { name: 'Chase', domain: 'chase.com', logoUrl: '/bank-logos/chase.png' },
@@ -84,24 +98,6 @@ function GoogleIcon() {
   )
 }
 
-function OptionIcon() {
-  return (
-    <svg
-      className="onboarding-option-icon-svg"
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      aria-hidden
-    >
-      <path d="M8 6h12M8 12h12M8 18h12M4 6v.01M4 12v.01M4 18v.01" />
-    </svg>
-  )
-}
-
 function SearchIcon() {
   return (
     <svg
@@ -136,8 +132,9 @@ function BankLogo({ bank, className }) {
 }
 
 export default function Onboarding() {
-  const { dispatch } = useApp()
+  const { state, dispatch } = useApp()
   const navigate = useNavigate()
+  const { accounts } = state
 
   const [step, setStep] = useState(1)
 
@@ -155,6 +152,9 @@ export default function Onboarding() {
 
   const [selectedBank, setSelectedBank] = useState('')
   const [bankSearch, setBankSearch] = useState('')
+  const [showManualForm, setShowManualForm] = useState(false)
+  const [showAccountSummary, setShowAccountSummary] = useState(false)
+  const [editingAccountId, setEditingAccountId] = useState(null)
 
   const toggleMulti = (setter, value) => {
     setter(prev => (prev.includes(value) ? prev.filter(x => x !== value) : [...prev, value]))
@@ -199,7 +199,7 @@ export default function Onboarding() {
             <div className="onboarding-welcome-hero" aria-hidden>
               <img src="/onboarding-hero.png" alt="" className="onboarding-welcome-img" />
             </div>
-            <h1 className="onboarding-welcome-title">Welcome to ProjectParity</h1>
+            <h1 className="onboarding-welcome-title">Welcome to Planit</h1>
             <p className="onboarding-welcome-subtitle">
               Set your goals, track spending, and stay on budget. One simple place for your money.
             </p>
@@ -302,20 +302,20 @@ export default function Onboarding() {
         {/* Step 3: What brings you */}
         {step === 3 && (
           <>
-            <h1 className="onboarding-title">What brings you to ProjectParity?</h1>
+            <h1 className="onboarding-title">What brings you to Planit?</h1>
             <p className="onboarding-subtitle">
               Select what matters most to you. You can choose more than one.
             </p>
             <div className="onboarding-option-list">
               {BRINGS_OPTIONS.map(opt => (
                 <button
-                  key={opt}
+                  key={opt.label}
                   type="button"
-                  className={`onboarding-option-item ${brings.includes(opt) ? 'selected' : ''}`}
-                  onClick={() => toggleMulti(setBrings, opt)}
+                  className={`onboarding-option-item ${brings.includes(opt.label) ? 'selected' : ''}`}
+                  onClick={() => toggleMulti(setBrings, opt.label)}
                 >
-                  <OptionIcon />
-                  <span className="onboarding-option-text">{opt}</span>
+                  <span className="onboarding-option-icon" aria-hidden>{opt.icon}</span>
+                  <span className="onboarding-option-text">{opt.label}</span>
                 </button>
               ))}
             </div>
@@ -338,13 +338,13 @@ export default function Onboarding() {
             <div className="onboarding-option-list">
               {HEAR_OPTIONS.map(opt => (
                 <button
-                  key={opt}
+                  key={opt.label}
                   type="button"
-                  className={`onboarding-option-item ${hear === opt ? 'selected' : ''}`}
-                  onClick={() => setHear(opt)}
+                  className={`onboarding-option-item ${hear === opt.label ? 'selected' : ''}`}
+                  onClick={() => setHear(opt.label)}
                 >
-                  <OptionIcon />
-                  <span className="onboarding-option-text">{opt}</span>
+                  <span className="onboarding-option-icon" aria-hidden>{opt.icon}</span>
+                  <span className="onboarding-option-text">{opt.label}</span>
                 </button>
               ))}
             </div>
@@ -367,13 +367,13 @@ export default function Onboarding() {
             <div className="onboarding-option-list">
               {PLAN_INCLUDE_OPTIONS.map(opt => (
                 <button
-                  key={opt}
+                  key={opt.label}
                   type="button"
-                  className={`onboarding-option-item ${planInclude.includes(opt) ? 'selected' : ''}`}
-                  onClick={() => toggleMulti(setPlanInclude, opt)}
+                  className={`onboarding-option-item ${planInclude.includes(opt.label) ? 'selected' : ''}`}
+                  onClick={() => toggleMulti(setPlanInclude, opt.label)}
                 >
-                  <OptionIcon />
-                  <span className="onboarding-option-text">{opt}</span>
+                  <span className="onboarding-option-icon" aria-hidden>{opt.icon}</span>
+                  <span className="onboarding-option-text">{opt.label}</span>
                 </button>
               ))}
             </div>
@@ -388,8 +388,50 @@ export default function Onboarding() {
           </>
         )}
 
-        {/* Step 6: Connect bank — Add account modal style */}
-        {step === 6 && (
+        {/* Step 6: Connect bank — Add account; or Add manual account form; or Account summary */}
+        {step === 6 && showManualForm && (
+          <AddManualAccount
+            variant="onboarding"
+            onBack={() => {
+              setShowManualForm(false)
+              setEditingAccountId(null)
+            }}
+            onClose={handleSkip}
+            onSubmit={(payload) => {
+              if (editingAccountId) {
+                dispatch({ type: 'UPDATE_ACCOUNT', payload: { id: editingAccountId, ...payload } })
+                setEditingAccountId(null)
+              } else {
+                dispatch({ type: 'ADD_ACCOUNT', payload })
+              }
+              setShowManualForm(false)
+              setShowAccountSummary(true)
+            }}
+            initialValues={
+              editingAccountId
+                ? accounts.find((a) => a.id === editingAccountId) || {}
+                : {}
+            }
+            isEdit={!!editingAccountId}
+          />
+        )}
+        {step === 6 && showAccountSummary && !showManualForm && (
+          <AccountSummary
+            accounts={accounts}
+            onRemove={(id) => dispatch({ type: 'REMOVE_ACCOUNT', payload: id })}
+            onEdit={(acc) => {
+              setEditingAccountId(acc.id)
+              setShowAccountSummary(false)
+              setShowManualForm(true)
+            }}
+            onAddAnother={() => setShowManualForm(true)}
+            onContinue={() => {
+              setShowAccountSummary(false)
+              setStep(7)
+            }}
+          />
+        )}
+        {step === 6 && !showManualForm && !showAccountSummary && (
           <div className="onboarding-add-account">
             <div className="onboarding-add-account-header">
               <h2 className="onboarding-add-account-title">Add account</h2>
@@ -403,7 +445,7 @@ export default function Onboarding() {
               </button>
             </div>
             <p className="onboarding-add-account-subtitle">
-              Connect your financial institution to ProjectParity.
+              Connect your financial institution to Planit.
             </p>
             <div className="onboarding-add-account-search-wrap">
               <input
@@ -442,7 +484,11 @@ export default function Onboarding() {
               <span className="onboarding-add-account-manual-label">
                 Track an asset or cash account.
               </span>
-              <button type="button" className="onboarding-add-account-manual-btn">
+              <button
+                type="button"
+                className="onboarding-add-account-manual-btn"
+                onClick={() => setShowManualForm(true)}
+              >
                 ADD MANUAL ACCOUNT
               </button>
             </div>

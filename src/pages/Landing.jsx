@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import Logo from '../components/Logo'
 
+/** Set to false to revert to the original landing hero (no fuel background, no rocket). */
+const USE_AMPLEMARKET_HERO = false
+
 /* 1=Taste, 2=Image by image, 3=Regardless, 4=Simple/Fast/Secure, 5=Stats (Designed to compound) */
 const getScrollThresholds = () => ({
   taste: window.innerHeight * 0.15,
@@ -176,12 +179,40 @@ export default function Landing() {
         </div>
       </header>
 
-      <main className="landing-hero">
+      <main className={`landing-hero ${USE_AMPLEMARKET_HERO ? 'landing-hero-ample' : ''}`}>
+        {USE_AMPLEMARKET_HERO && (
+          <>
+            <div className="landing-hero-fuel-bg" aria-hidden>
+              <div className="landing-hero-fuel-stream landing-hero-fuel-stream-1" aria-hidden />
+              <div className="landing-hero-fuel-stream landing-hero-fuel-stream-2" aria-hidden />
+              <div className="landing-hero-fuel-noise" aria-hidden />
+            </div>
+            <div className="landing-hero-rocket-wrap" aria-hidden>
+              <div className="landing-hero-rocket">
+                <svg viewBox="0 0 120 200" fill="none" xmlns="http://www.w3.org/2000/svg" className="landing-rocket-svg">
+                  <title>Rocket</title>
+                  <path d="M60 8 L62 8 L62 22 L58 22 L58 8 Z" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M52 18 L68 18" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+                  <path d="M55 14 L55 26 M65 14 L65 26" stroke="currentColor" strokeWidth="1" fill="none" strokeLinecap="round" />
+                  <ellipse cx="60" cy="6" rx="5" ry="4" stroke="currentColor" strokeWidth="1.2" fill="none" />
+                  <path d="M60 28 L58 85 L60 90 L62 85 Z" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinejoin="round" />
+                  <path d="M60 35 L95 165 L60 182 L25 165 Z" stroke="currentColor" strokeWidth="2" fill="none" strokeLinejoin="round" />
+                  <path d="M38 75 L48 72 L52 80 L42 88 M82 75 L72 72 L68 80 L78 88" stroke="currentColor" strokeWidth="1" fill="none" opacity="0.7" strokeLinejoin="round" />
+                  <path d="M45 110 L50 108 L52 115 M75 110 L70 108 L68 115" stroke="currentColor" strokeWidth="1" fill="none" opacity="0.5" />
+                  <path d="M25 165 Q60 160 95 165" stroke="currentColor" strokeWidth="1.5" fill="none" opacity="0.5" />
+                  <path d="M60 182 L60 200" stroke="currentColor" strokeWidth="2" fill="none" />
+                  <path d="M48 198 L60 200 L72 198" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+                </svg>
+                <div className="landing-hero-rocket-exhaust" />
+              </div>
+            </div>
+          </>
+        )}
         <div className="landing-hero-inner landing-hero-content">
           <section className="landing-hero-copy">
             <p className="landing-hero-announce">
               <span className="landing-hero-announce-dot" />
-              Backed by a $100M Series B from OpenAI
+              Early access launching soon
             </p>
             <h1 className="landing-headline">
               Financial freedom
@@ -190,8 +221,6 @@ export default function Landing() {
             </h1>
             <p className="landing-subheadline">
               Simplify spending, clarify priorities, and bring more joy to every dollar.
-              <br />
-              Who do you want to be and how can the money you earn get you there?
             </p>
             <div className="landing-cta-row">
               <Link to="/onboarding" className="landing-cta-get-started">

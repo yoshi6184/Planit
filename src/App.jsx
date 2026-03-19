@@ -9,7 +9,6 @@ import Dashboard from './pages/Dashboard'
 import TransactionsSummary from './pages/TransactionsSummary'
 import AccountPage from './pages/AccountPage'
 import Reports from './pages/Reports'
-import Tasks from './pages/Tasks'
 
 export default function App() {
   const { state } = useApp()
@@ -35,7 +34,6 @@ export default function App() {
         <Route path="/transactions/accounts/:accountId" element={<AccountPage />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/plan" element={<Plan />} />
-        <Route path="/tasks" element={<Tasks />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </Layout>

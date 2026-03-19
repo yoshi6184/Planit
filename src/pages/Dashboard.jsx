@@ -1,20 +1,35 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useRef, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { ComposedChart, Line, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { useApp } from '../context/AppContext'
+import PageHeaderRow from '../components/PageHeaderRow'
 import { ACCOUNT_TYPES } from '../context/AppContext'
+import { getCategoryEmoji } from '../data/mockData'
 import { formatCurrency } from '../utils/format'
+import AccountDisplayName from '../components/AccountDisplayName'
+import AddManualAccount from '../components/AddManualAccount'
 
 const currentMonth = '2025-02'
 
 export default function Dashboard() {
   const { state, dispatch } = useApp()
   const navigate = useNavigate()
+  const [showAddAccountMenu, setShowAddAccountMenu] = useState(false)
   const [showAddAccount, setShowAddAccount] = useState(false)
+  const [showManualForm, setShowManualForm] = useState(false)
   const [newAccount, setNewAccount] = useState({ name: '', type: 'checking' })
-  const [hideBalances, setHideBalances] = useState(false)
+  const addAccountMenuRef = useRef(null)
 
-  const { monthlyIncome, categories, categoryBudgets, accounts, transactions, quote } = state
+  useEffect(() => {
+    if (!showAddAccountMenu) return
+    const close = (e) => {
+      if (addAccountMenuRef.current && !addAccountMenuRef.current.contains(e.target)) setShowAddAccountMenu(false)
+    }
+    document.addEventListener('click', close)
+    return () => document.removeEventListener('click', close)
+  }, [showAddAccountMenu])
+
+  const { monthlyIncome, categories, categoryBudgets, accounts, transactions, quote, hideBalances } = state
 
   const totalAccounts = useMemo(
     () => accounts.reduce((sum, a) => sum + (a.balance || 0), 0),
@@ -64,7 +79,7 @@ export default function Dashboard() {
 
   const spendVsBudgetPct = totalBudgeted > 0 ? Math.min(100, (totalSpent / totalBudgeted) * 100) : 0
 
-  const TREND_MONTHS = ['2024-11', '2024-12', '2025-01', '2025-02']
+  const TREND_MONTHS = ['2024-09', '2024-10', '2024-11', '2024-12', '2025-01', '2025-02']
 
   const monthlyTrend = useMemo(() => {
     const byMonth = {}
@@ -79,6 +94,35 @@ export default function Dashboard() {
       budget: monthlyIncome || 0,
     }))
   }, [transactions, monthlyIncome])
+
+  // Weekly breakdown for wavy chart: 4 points per month with varied distribution so the line goes up and down
+  const spendingTrendWavy = useMemo(() => {
+    const weeklyBudget = monthlyIncome ? monthlyIncome / 4.33 : 0
+    const weekShares = [
+      [0.22, 0.30, 0.24, 0.24],
+      [0.28, 0.20, 0.30, 0.22],
+      [0.20, 0.32, 0.22, 0.26],
+      [0.26, 0.24, 0.28, 0.22],
+      [0.24, 0.22, 0.30, 0.24],
+      [0.30, 0.26, 0.22, 0.22],
+    ]
+    const out = []
+    monthlyTrend.forEach((row, monthIdx) => {
+      const shares = weekShares[monthIdx % weekShares.length]
+      const [y, m] = row.month.split('-').map(Number)
+      shares.forEach((share, i) => {
+        const day = 1 + i * 7
+        const dateStr = `${row.month}-${String(day).padStart(2, '0')}`
+        out.push({
+          date: dateStr,
+          label: dateStr,
+          spent: Math.round((row.spent * share) * 100) / 100,
+          budget: Math.round(weeklyBudget * 100) / 100,
+        })
+      })
+    })
+    return out
+  }, [monthlyTrend, monthlyIncome])
 
   const topVendors = useMemo(() => {
     const byPayee = {}
@@ -173,74 +217,62 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard-page">
-      <header className="dashboard-topbar">
-        <div className="dashboard-topbar-spacer" />
-        <div className="dashboard-topbar-right">
-          <div className="dashboard-topbar-search-wrap">
-            <div className="dashboard-search">
-              <span className="dashboard-search-icon" aria-hidden>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="11" cy="11" r="8" />
-                  <path d="m21 21-4.35-4.35" />
-                </svg>
-              </span>
-              <input
-                type="search"
-                className="dashboard-search-input"
-                placeholder="Search for anything"
-              />
-              <kbd className="dashboard-search-kbd">Ctrl K</kbd>
-            </div>
-          </div>
-          <button
-            type="button"
-            className="dashboard-eye-toggle"
-            onClick={() => setHideBalances((v) => !v)}
-            aria-label={hideBalances ? 'Show balances' : 'Hide balances'}
-          >
-            {hideBalances ? (
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-                <line x1="1" y1="1" x2="23" y2="23" />
-              </svg>
-            ) : (
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                <circle cx="12" cy="12" r="3" />
-              </svg>
-            )}
-          </button>
-          <button type="button" className="dashboard-notify-btn" aria-label="Notifications">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-            </svg>
-          </button>
-          <button type="button" className="btn dashboard-topbar-btn">
-            Move money
-          </button>
-          <button type="button" className="dashboard-avatar" aria-label="Profile">
-            {(state.user && state.user.initials) || 'JP'}
-          </button>
+      {showManualForm && (
+        <div className="add-manual-account-overlay">
+          <AddManualAccount
+            onBack={() => setShowManualForm(false)}
+            onClose={() => setShowManualForm(false)}
+            onSubmit={(payload) => {
+              dispatch({ type: 'ADD_ACCOUNT', payload })
+              setShowManualForm(false)
+            }}
+          />
         </div>
-      </header>
-
-      <h1 className="dashboard-greeting">Hello, David</h1>
+      )}
+      <PageHeaderRow left={<h1 className="dashboard-greeting">Hello, David</h1>} />
 
       <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-start' }}>
         {/* Left: accounts, net worth, action checklist */}
         <aside style={{ width: 260, flexShrink: 0 }}>
           <div className="card" style={{ padding: '1rem', marginBottom: '1rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', position: 'relative' }} ref={addAccountMenuRef}>
               <h2 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>Accounts</h2>
               <button
                 type="button"
-                className="btn btn-ghost"
+                className="btn btn-ghost dashboard-add-account-trigger"
                 style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem' }}
-                onClick={() => setShowAddAccount(true)}
+                onClick={() => setShowAddAccountMenu((v) => !v)}
               >
                 + Add account
               </button>
+              {showAddAccountMenu && (
+                <div className="dashboard-add-account-menu">
+                  <button
+                    type="button"
+                    className="dashboard-add-account-menu-item"
+                    onClick={() => {
+                      setShowAddAccountMenu(false)
+                      setShowManualForm(true)
+                    }}
+                  >
+                    <span className="dashboard-add-account-menu-icon">+</span>
+                    Create account
+                  </button>
+                  <button
+                    type="button"
+                    className="dashboard-add-account-menu-item"
+                    onClick={() => {
+                      setShowAddAccountMenu(false)
+                      setShowAddAccount(true)
+                    }}
+                  >
+                    <span className="dashboard-add-account-menu-icon dashboard-add-account-menu-icon-link" aria-hidden>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>
+                    </span>
+                    Link account
+                  </button>
+                </div>
+              )}
             </div>
             <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
               {accounts.map((acc) => (
@@ -250,7 +282,7 @@ export default function Dashboard() {
                     onClick={() => navigate(`/transactions/accounts/${acc.id}`)}
                     className="dashboard-account-row"
                   >
-                    <div style={{ fontWeight: 500 }}>{acc.name}</div>
+                    <div style={{ fontWeight: 500 }}><AccountDisplayName account={acc} /></div>
                     <div className="dashboard-account-meta">
                       <span className="dashboard-account-type">{getAccountTypeLabel(acc.type)}</span>
                       <span className={`dashboard-account-value ${(acc.balance || 0) >= 0 ? 'amount-positive' : acc.type === 'credit' ? 'amount-negative' : 'amount-spent'}`}>
@@ -291,7 +323,7 @@ export default function Dashboard() {
 
           <div className="card" style={{ marginBottom: '1rem', padding: '1rem 1.25rem' }}>
             <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Net worth</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 700 }} className={totalAccounts >= 0 ? 'amount-positive' : 'amount-spent'}>
+            <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text)' }}>
               {formatMaybeHidden(totalAccounts)}
             </div>
             <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
@@ -421,9 +453,13 @@ export default function Dashboard() {
                   const available = budget - monthSpent
                   const pctSpent = budget > 0 ? Math.min(100, (monthSpent / budget) * 100) : 0
                   const pctAvail = budget > 0 ? Math.max(0, 100 - pctSpent) : 0
+                  const emoji = getCategoryEmoji(r.id)
                   return (
                     <tr key={r.id}>
-                      <td>{r.name}</td>
+                      <td>
+                        <span className="dashboard-category-emoji" aria-hidden>{emoji}</span>
+                        {r.name}
+                      </td>
                       <td>
                         <div className="dashboard-summary-bar">
                           <div className="dashboard-summary-bar-spent" style={{ width: `${pctSpent}%` }} />
@@ -502,19 +538,6 @@ export default function Dashboard() {
               </ul>
             ) : (
               <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>No vendor data.</p>
-            )}
-            {topIncomes.length > 0 && (
-              <>
-                <h2 style={{ margin: '1.25rem 0 0.5rem', fontSize: '1rem', fontWeight: 600 }}>Top Income</h2>
-                <div className="dashboard-income-section">
-                  {topIncomes.map((inc) => (
-                    <div key={inc.payee} className="dashboard-income-row">
-                      <span>{inc.label} · {inc.payee}</span>
-                      <span className="amount-positive">{formatCurrency(inc.amount)}</span>
-                    </div>
-                  ))}
-                </div>
-              </>
             )}
           </div>
         </div>
