@@ -7,13 +7,33 @@ A simple, YNAB-style personal budgeting web app with onboarding, configuration, 
 
 ## Screenshots
 
-![Dashboard](docs/screenshots/Dashboard.png)
 
-![Budget](docs/screenshots/Budget.png)
+<h3 align="center">Dashboard</h3>
+<p align="center">
+  <img src="docs/screenshots/Dashboard.png" alt="Dashboard" width="700">
+</p>
 
-![Transactions](docs/screenshots/Transactions.png)
+---
 
-![Reports](docs/screenshots/Reports.png)
+<h3 align="center">Budget</h3>
+<p align="center">
+  <img src="docs/screenshots/Budget.png" alt="Budget plan" width="700">
+</p>
+
+---
+
+<h3 align="center">Transactions</h3>
+<p align="center">
+  <img src="docs/screenshots/Transactions.png" alt="Transactions" width="700">
+</p>
+
+---
+
+<h3 align="center">Reports</h3>
+<p align="center">
+  <img src="docs/screenshots/Reports.png" alt="Reports" width="700">
+</p>
+
 
 ## Run
 
