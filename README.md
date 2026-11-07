@@ -1,6 +1,8 @@
-# Personal Budget — Control Your Finance
+# Planit — Personal Budgeting App
 
 A simple, YNAB-style personal budgeting web app with onboarding, configuration, dashboard, transactions, and reports. Uses mock data.
+
+![Landing](docs/screenshots/Landing.png)
 
 ## Features
 
@@ -9,6 +11,23 @@ A simple, YNAB-style personal budgeting web app with onboarding, configuration, 
 - **Dashboard** — Total balance, budget left, spend vs budget bar chart, spending pie chart, account list, category progress bars, inspirational quote
 - **Transactions** — Add transactions, import (CSV-style: date, payee, amount, categoryId), connect bank (mock)
 - **Reports** — Monthly spending trend, spending by category, detailed summary table
+
+## Screenshots
+
+### Landing
+![Landing](docs/screenshots/Landing.png)
+
+### Dashboard
+![Dashboard](docs/screenshots/Dashboard.png)
+
+### Budget
+![Budget](docs/screenshots/Budget.png)
+
+### Transactions
+![Transactions](docs/screenshots/Transactions.png)
+
+### Reports
+![Reports](docs/screenshots/Reports.png)
 
 ## Run
 
