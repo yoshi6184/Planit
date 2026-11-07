@@ -1,6 +1,8 @@
-# Planit — Personal Budgeting App
+# Planit: Take Control of Your Finances
 
-A simple, YNAB-style personal budgeting web app with onboarding, configuration, dashboard, transactions, and reports. Uses mock data.
+Planit is a simple personal finance app that works. 
+
+It's built on the zero-based budgeting method and works like cash envelopes. When you get paid, you split your money into envelopes: rent, groceries, gas. Each dollar has a job.  That's how money actually works, it's finite and every dollar assigned cannot be used anywhere else.
 
 ![Landing](docs/screenshots/Landing.png)
 
