@@ -8,32 +8,34 @@ A simple, YNAB-style personal budgeting web app with onboarding, configuration, 
 ## Screenshots
 
 
-<h3 align="center">Dashboard</h3>
-<p align="center">
-  <img src="docs/screenshots/Dashboard.png" alt="Dashboard" width="700">
-</p>
+## Screenshots
 
----
-
-<h3 align="center">Budget</h3>
-<p align="center">
-  <img src="docs/screenshots/Budget.png" alt="Budget plan" width="700">
-</p>
-
----
-
-<h3 align="center">Transactions</h3>
-<p align="center">
-  <img src="docs/screenshots/Transactions.png" alt="Transactions" width="700">
-</p>
-
----
-
-<h3 align="center">Reports</h3>
-<p align="center">
-  <img src="docs/screenshots/Reports.png" alt="Reports" width="700">
-</p>
-
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <img src="docs/screenshots/Onboarding.png" alt="Onboarding">
+      <br>
+      <sub><b>Onboarding</b></sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="docs/screenshots/Dashboard.png" alt="Dashboard">
+      <br>
+      <sub><b>Dashboard</b></sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <img src="docs/screenshots/Budget.png" alt="Budget">
+      <br>
+      <sub><b>Budget</b></sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="docs/screenshots/Transactions.png" alt="Transactions">
+      <br>
+      <sub><b>Transactions</b></sub>
+    </td>
+  </tr>
+</table>
 
 ## Run
 
