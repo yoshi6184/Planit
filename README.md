@@ -7,7 +7,7 @@ It's built on the zero-based budgeting method and works like cash envelopes. Whe
 ![Landing](docs/screenshots/Landing.png)
 
 
-## Screenshots
+## Demo
 
 
 
