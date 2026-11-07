@@ -8,19 +8,18 @@ A simple, YNAB-style personal budgeting web app with onboarding, configuration, 
 ## Screenshots
 
 
-## Screenshots
 
 <table>
   <tr>
     <td align="center" width="50%">
-      <img src="docs/screenshots/Onboarding.png" alt="Onboarding">
-      <br>
-      <sub><b>Onboarding</b></sub>
-    </td>
-    <td align="center" width="50%">
       <img src="docs/screenshots/Dashboard.png" alt="Dashboard">
       <br>
       <sub><b>Dashboard</b></sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="docs/screenshots/Onboarding.png" alt="Onboarding">
+      <br>
+      <sub><b>Onboarding</b></sub>
     </td>
   </tr>
   <tr>
